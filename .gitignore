@@ -3,4 +3,5 @@
 
 # But not these files...
 !.gitignore
-!/site/modules/Pwvc/*
+!site/modules/Pwvc/*
+!site/modules/Pwvc/*/*
