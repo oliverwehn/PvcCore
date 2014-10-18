@@ -1,7 +1,10 @@
 # Ignore everything
 *
-
-# But not these files...
 !.gitignore
+!site
+site/*
+!site/modules
+site/modules/*
+!site/modules/Pwvc
 !site/modules/Pwvc/*
-!site/modules/Pwvc/*/*
+!site/modules/Pwvc/**/*

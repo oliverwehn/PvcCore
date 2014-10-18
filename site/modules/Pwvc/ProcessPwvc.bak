@@ -1,0 +1,1046 @@
+<?php
+/**
+ * PWvc Module Class V. 0.9.1
+ * Part of PWvc, a module for ProcessWire 2.3+
+ *
+ * by Oliver Wehn
+ * https://github.com/oliverwehn
+ *
+ * inspired of and based on parts of MVC Module by Harmster
+ * https://github.com/Hawiak
+ * hawiak.nl
+ *
+ * Basic Controller class that extends PW’s Wire class and
+ * so provides access to fuel vars besides basic module-specific
+ * methods. Don’t modifiy.
+ *
+ */
+namespace PWvc;
+
+require_once('Controller.php');
+require_once('PwvcRenderer.php');
+
+class ProcessPwvc extends \Process implements \Module, \ConfigurableModule {
+
+	const PAGE_NAME = 'pwvc-module';
+	const PERMISSION_NAME = 'pwvc-module';
+	const MODULE_NAME = 'PWvc';
+	const TEMPLATE_FILENAME = 'pwvc';
+	const DEFAULT_LAYOUT_NAME = 'layout';
+	const DEFAULT_RENDERER = 'Native';
+  const NS = 'PWvc';
+
+	private $app_controller = 'AppController.php';
+	private $templates_rel_path = '';
+	private $renderer = null;
+
+	private $hooks = array();
+
+	private $request = array(
+										'page' => null,
+										'action' => null,
+										'controller_path' => null,
+										'controller' => null,
+										'layout_file' => null,
+										'view_file' => null,
+										'scope' => array('fuel' => array(), 'root'=> array()),
+										'errors' => array()
+ 										);
+	private $requests = array();
+
+	private static
+					$extensions = array(
+										'controllers' => '.php',
+										'layouts' => '.php',
+										'layouts_twig' => '.tmpl',
+										'views' => '.view.php',
+										'views_twig' => '.view.tmpl',
+										'snippets' => '.snippet.php',
+										'snippets_twig' => '.snippet.tmpl'
+										);
+
+	private static
+			  $defaults = array(
+										'app_controller_path' => 'site/templates/',
+										'layouts_path' => 'site/templates/layouts/',
+										'controllers_path' => 'site/templates/controllers/',
+										'views_path' => 'site/templates/views/',
+										'snippets_path' => 'site/templates/snippets/',
+										'assets_path' => 'site/templates/assets/',
+										'scripts_markup' => '<script src="%s"></script>',
+										'styles_markup' => '<link rel="stylesheet" href="%s">',
+										'renderer_name' => self::DEFAULT_RENDERER
+										);
+
+	public static function getModuleInfo(){
+		return array(
+			'title' => 'PWvc',
+			'summary' => __('Stands for ProcessWire-Module-View. A module that implements MVC’ish template processing.'),
+			'autoload' => true,
+			'version' => 050,
+			'author' => 'Oliver Wehn, Harmster',
+			'href' => 'https://github.com/oliverwehn/PWvc'
+		);
+	}
+
+	public function init(){
+		// set global pwvc var
+		Wire::setFuel('pwvc', $this);
+
+		if(!$this->renderer_name)
+			$this->renderer_name = self::DEFAULT_RENDERER;
+
+			if(!$this->_init_renderer($this->renderer_name)) {
+			throw new WireException(sprintf($this->_("Failed loading renderer '%s'"), $this->renderer_name));
+		}
+
+		// set relative template dir
+    $this->templates_rel_path = str_replace($this->config->paths->root, '', $this->config->paths->templates);
+
+    // set up default paths from config
+    $pwvc_paths = new Paths($this->config->paths->get('root'));
+    $pwvc_urls = new Paths($this->config->urls->templates);
+    $pwvc_paths->set('app_controller', $this->_get_default_path('app_controller_path'));
+    $pwvc_paths->set('controllers', $this->_get_default_path('controllers_path'));
+    $pwvc_paths->set('layouts', $this->_get_default_path('layouts_path'));
+    $pwvc_paths->set('views',  $this->_get_default_path('views_path'));
+    $pwvc_paths->set('snippets', $this->_get_default_path('snippets_path'));
+    $pwvc_paths->set('assets', $this->_get_default_path('assets_path'));
+    $pwvc_urls->set('assets', $this->get_rel_path($pwvc_paths->get('assets'), $this->config->urls->templates));
+    $pwvc_paths->set('styles', $this->validate_dir($pwvc_paths->get('assets') . 'styles/'));
+    $pwvc_urls->set('styles', $this->get_rel_path($pwvc_paths->get('styles'), $this->config->urls->templates));
+    $pwvc_paths->set('scripts', $this->validate_dir($pwvc_paths->get('assets') . 'scripts/'));
+    $pwvc_urls->set('scripts', $this->get_rel_path($pwvc_paths->get('scripts'), $this->config->urls->templates));
+    $pwvc_paths->set('images', $this->validate_dir($pwvc_paths->get('assets') . 'images/'));
+    $pwvc_urls->set('images', $this->get_rel_path($pwvc_paths->get('images'), $this->config->urls->templates));
+    $this->set('paths', $pwvc_paths);
+    $this->set('urls', $pwvc_urls);
+    if($this->paths->app_controller == "")
+    	$app_controller = $this->config->paths->templates . $this->app_controller;
+    else
+    	$app_controller = 	$this->paths->app_controller . $this->app_controller;
+    // include AppController class
+		require_once($app_controller);
+	}
+
+	public function ready() {
+		// get admin page for use in backend navigation
+		$this->page = wire('page');
+
+    // if module’s config is edited, add hook dealing with path changes
+    if($this->page->process == 'ProcessModule') {
+    	$this->hooks['save_module'] = wire('modules')->addHookBefore('saveModuleConfigData', $this, 'processModuleConfigPaths');
+    }
+    // keep ProcessTemplate from finding PWvc’s php files in template dir
+    if($this->page->process == 'ProcessTemplate') {
+    	$this->hooks['hide_controller'] = $this->addHookBefore('ProcessTemplate::executeAdd', $this, 'hideAppController');
+    	$this->hooks['unhide_controller'] = $this->addHookAfter('ProcessTemplate::executeAdd', $this, 'unhideAppController');
+    }
+	}
+
+	/**
+	 * Configuration
+	 */
+	static public function getModuleConfigInputfields(array $data){
+		$pwvc = wire('pwvc');
+
+		$form = new InputfieldForm();
+		$form->attr('id', 'pwvc-config');
+		$wrapper = new InputfieldWrapper();
+		$wrapper->label = __("General Configuration");
+
+		// config
+		$config = wire('config');
+
+		// relative template dir
+		$templates_rel_path = str_replace($config->paths->root, '', $config->paths->templates);
+
+		// field for name of default layout file
+		$field_value = isset($data['default_layout']) ? $data['default_layout'] : self::DEFAULT_LAYOUT_NAME;
+		$default_layout = $field_value . self::ext('layouts');
+		$field = new InputfieldText();
+		$field->label = 'Default layout file (php file in your layouts folder)';
+		$field->attr('name+id', 'default_layout');
+		$field->description = file_exists(wire('config')->paths->root . $data['layouts_path'] . $default_layout)?sprintf(__("Layout file '%s' was found."), $default_layout):sprintf(__("Please provide a layout file '%s' in your layout directory '%s'."), $default_layout, $data['layouts_path']);
+		$field->value = $field_value;
+		$wrapper->append($field);
+
+		// field for switching template engine
+		$field = new InputfieldSelect();
+		$field->label = 'Default Template Renderer';
+		$field->attr('name+id', 'renderer_name');
+		$d = dir(dirname(__FILE__));
+		while($f = $d->read()) {
+			if(preg_match("#^PwvcRenderer(([A-Z][a-z]+)+)\.php$#", $f, $match)) {
+				$name = $match[1];
+				$field->addOption($name, null, $data['renderer_name'] == $name?array('selected'=>'selected'):null);
+			}
+		}
+		$wrapper->append($field);
+
+		$form->append($wrapper);
+
+		// paths
+		$wrapper = new InputfieldWrapper();
+		$wrapper->label = __("Configure file locations");
+
+		// field for layouts path
+		$field = new InputfieldText();
+		$field->label = "Layouts path";
+		$field->attr('name+id', 'layouts_path');
+		if(isset($data['layouts_path']) ? $field->value = self::clean_path($data['layouts_path']) : $field->value = self::$defaults['layouts_path']);
+		$wrapper->append($field);
+
+		// field for app controller path
+		$field = new InputfieldText();
+		$field->label = 'App Controller folder, where is the App Controller located';
+		$field->attr('name+id', 'app_controller_path');
+		if(isset($data['app_controller_path']) ? $field->value = self::clean_path($data['app_controller_path']) : $field->value = self::$defaults['app_controller_path']);
+		$wrapper->append($field);
+		$form->append($wrapper);
+
+		// field for controllers path
+		$field = new InputfieldText();
+		$field->label = "Controllers path";
+		$field->attr('name+id', 'controllers_path');
+		if(isset($data['controllers_path']) ? $field->value = self::clean_path($data['controllers_path']) : $field->value = self::$defaults['controllers_path']);
+		$wrapper->append($field);
+
+		// field for snippets path
+		$field = new InputfieldText();
+		$field->label = "Snippets path";
+		$field->attr('name+id', 'snippets_path');
+		if(isset($data['snippets_path']) ? $field->value = self::clean_path($data['snippets_path']) : $field->value = self::$defaults['snippets_path']);
+		$wrapper->append($field);
+
+		// field for views path
+		$field = new InputfieldText();
+		$field->label = "Views path";
+		$field->attr('name+id', 'views_path');
+		if(isset($data['views_path']) ? $field->value = self::clean_path($data['views_path']) : $field->value = self::$defaults['views_path']);
+		$wrapper->append($field);
+		$form->append($wrapper);
+
+		// field for assets path
+		$field = new InputfieldText();
+		$field->label = "Assets path";
+		$field->attr('name+id', 'assets_path');
+		if(isset($data['assets_path']) ? $field->value = self::clean_path($data['assets_path']) : $field->value = self::$defaults['assets_path']);
+		$wrapper->append($field);
+
+		$form->append($wrapper);
+
+		// paths
+		$wrapper = new InputfieldWrapper();
+		$wrapper->label = __("Markup Templates");
+
+		// field for styles markup
+		$field = new InputfieldText();
+		$field->label = "Styles";
+		$field->attr('name+id', 'styles_markup');
+		if(isset($data['styles_markup']) ? $field->value = $data['styles_markup'] : $field->value = self::$defaults['styles_markup']);
+		$wrapper->append($field);
+
+		// field for scripts markup
+		$field = new InputfieldText();
+		$field->label = "Scripts";
+		$field->attr('name+id', 'scripts_markup');
+		if(isset($data['scripts_markup']) ? $field->value = $data['scripts_markup'] : $field->value = self::$defaults['scripts_markup']);
+		$wrapper->append($field);
+
+		$form->append($wrapper);
+		return $form;
+	}
+
+	public function processModuleConfigPaths(HookEvent $event) {
+		$args = $event->arguments;
+		// make sure it is this module’s config being edited
+		if($args[0] != get_class($this)) return;
+		// check all paths
+		$data = $args[1];
+		foreach($data as $cfg_k => $cfg_v) {
+			if(preg_match("#_path$#", $cfg_k)) {
+				$paths = array(
+					'new' => $this->clean_path(rtrim($this->config->paths->root, '/') . $cfg_v),
+					'curr' => $this->$cfg_k
+				);
+				if(($paths['new'] != $paths['curr']) && (is_dir($paths['curr']))) {
+					$subpaths = array();
+					foreach($paths as $k => $path) {
+						if(($subpath = $this->get_rel_path($path, $this->config->paths->templates)) !== false) {
+							$subpaths[$k] = $subpath;
+						}
+					}
+					// deal with situation when path is the default template directory (only allowed for app controller)
+					if((strlen($subpaths['new']) == 0) && ($cfg_k != 'app_controller_path')) {
+						$data[$cfg_k] = "/" . $this->templates_rel_path . $subpaths['curr'];
+						$this->session->error(sprintf($this->_("Path of %s has to be a subdirectory of '%s'."), $cfg_k, $this->config->templates));
+					} else {
+						$files = array();
+						if($cfg_k == 'app_controller_path') {
+							$files[] = $this->app_controller;
+						} else {
+							if($this->validate_dir($paths['new'])) {
+								$d = dir($subpaths['curr']);
+								while($f = $d->read()) {
+									if(is_file($f) || is_dir($f)) {
+										rename($paths['curr'] . $f, $paths['new'] . $f);
+									}
+								}
+								if($this->is_dir_empty($paths['curr'])) {
+									rmdir($paths['curr']);
+								} else {
+									throw new WireException(sprintf($this->_("Directory '%s' can’t be deleted because it’s not empty."), $paths['curr']));
+								}
+							} else {
+								throw new WireException(sprintf($this->_("Path '%s' doesn’t exist and can’t be created."), $paths['new']));
+							}
+						}
+					}
+				}
+			}
+			$event->arguments(1, $data);
+		}
+	}
+
+	/**
+	 * Hide module php files from ProcessTemplate
+	 */
+	public function hideAppController($event) {
+		$this->prependTemplateFile = $this->config->prependTemplateFile;
+		$this->appendTemplateFile = $this->config->appendTemplateFile;
+		$this->config->prependTemplateFile = self::TEMPLATE_FILENAME . '.php';
+		$this->config->appendTemplateFile = $this->app_controller;
+	}
+	public function unhideAppController($event) {
+		$this->config->prependTemplateFile = $this->prependTemplateFile;
+		$this->config->appendTemplateFile = $this->appendTemplateFile;
+	}
+	/**
+	 * Install / Uninstall
+	 */
+	public function ___install() {
+
+		$page = $this->pages->get('template=admin, name='.self::PAGE_NAME);
+		if(!$page->id){
+			$page = new Page();
+			$page->template = $this->templates->get('admin');
+			$page->parent = $this->pages->get($this->config->adminRootPageID)->get('name=setup');
+			$page->name = self::PAGE_NAME;
+			$page->title = self::MODULE_NAME;
+			$page->process = $this;
+			$page->save();
+		}
+		$permission = $this->permissions->get(self::PERMISSION_NAME);
+		if(!$permission->id){
+			$permission = new Permission();
+			$permission->name = self::PERMISSION_NAME;
+			$permission->title = sprintf(__('Access the %s module'), self::MODULE_NAME);
+		}
+
+		// set defaults
+		$data = array('adminPageId' => $page->id);
+		foreach(self::$defaults as $key => $path)
+			$data[$key] = $path;
+		$data['default_layout'] = self::DEFAULT_LAYOUT_NAME;
+		wire('modules')->saveModuleConfigData(__CLASS__, $data);
+	}
+
+	public function ___uninstall(){
+		$templates = $this->templates->find('altFilename=pwvc');
+		foreach($templates as $template) {
+			$template->set('altFilename', '')->save();
+		}
+		$permission = $this->permissions->get(self::PERMISSION_NAME);
+		if($permission->id){
+			$permission->delete();
+		}
+		$page = $this->pages->get('template=admin, name='.self::PAGE_NAME);
+		if($page->id){
+			$page->delete();
+		}
+	}
+
+	/**
+	 *	Administration / Backend
+	 */
+	// Index of controllers
+	public function execute(){
+		return $this->_renderIndex();
+	}
+	// Controller views / view creation
+	public function ___executeController(){
+		if($this->input->urlSegment2) {
+			if($this->input->urlSegment3) {
+				return $this->_renderControllerViewNew();
+			} else {
+				return $this->_renderControllerViews();
+			}
+		} else {
+			return $this->_renderControllerNew();
+		}
+	}
+
+	private function _renderIndex(){
+		$this->setFuel('processHeadline', sprintf('%s: %s', self::MODULE_NAME, $this->_('Controllers')));
+		$form = $this->modules->get('InputfieldForm');
+		$form->attr('action', './');
+		$form->attr('method', 'post');
+		$form->attr('id', 'modules_form');
+
+		$controller_index = new InputfieldWrapper();
+		$field = new InputfieldMarkup();
+		$table = $this->modules->get("MarkupAdminDataTable");
+		$table->setEncodeEntities(false);
+		$header = array(
+			$this->_x('Controller', 'list-thead'),
+			$this->_x('Views', 'list-thead'));
+		$table->headerRow($header);
+		$field->label = $this->_("Controllers");
+		$controller_html = "";
+		$i = 0;
+		foreach($this->templates as $t){
+			if($t->altFilename == self::TEMPLATE_FILENAME) {
+				$controller_class = $this->sanitize_controller_name($t->name).'Controller';
+				if($controller_methods = $this->_get_controller_methods($controller_class)) {
+					$table->row(array('<a href="./controller/' . $this->get_controller_filename($controller_class) . '/">' . $t->name . '</a>', count($controller_methods)));
+					$i++;
+				}
+			}
+		}
+		if($i == 0) {
+			$table->row(array($this->_("No controllers set up, yet."), ''));
+		}
+		$field->attr('value', $table->render());
+		$controller_index->append($field);
+		$form->append($controller_index);
+
+		$submit = $this->modules->get('InputfieldButton');
+		$submit->attr('href', './controller/');
+		$submit->attr('class', $submit->attr('class') . ' head_button_clone');
+		$submit->attr('name', 'controller_new');
+		$submit->attr('value', $this->_('Create Controller'));
+		$form->add($submit);
+		return $form->render();
+	}
+
+	private function _renderControllerNew(){
+		$this->setFuel('processHeadline', sprintf('%s: %s', self::MODULE_NAME, $this->_('New Controller')));
+		wire('breadcrumbs')->add(new Breadcrumb('../', $this->page->title));
+
+		if($_SERVER['REQUEST_METHOD'] == 'POST'){
+
+			// get template
+			$template_id = $this->sanitizer->selectorValue($this->input->post('template'));
+			$template_name = $this->templates->get($template_id)->name;
+
+			// check if controller name is valid
+			if(!$template_id) {
+				$this->session->error($this->_("Please select a valid template."));
+				$this->session->redirect('./');
+			}
+			// get list of actions
+			$actions = array('index');
+			if($this->input->post->actions) {
+				$temp_actions = explode(",", $this->input->post->actions);
+				foreach($temp_actions as $i => $action) {
+					if(preg_match("#^[ ]*([a-z0-9_]+)[ ]*$#i", $action, $match)) {
+						$action = $match[1];
+						if(!in_array($action, $actions)) $actions[] = $action;
+					}
+				}
+			}
+
+			// transform template_name in valid controller_name and create file
+			if(($controller_name = $this->sanitize_controller_name($template_name)) && ($this->_create_controller_file($controller_name, $actions))) {
+				foreach($actions as $action) {
+					if(!$this->_create_view_file($controller_name, $action)) throw new WireException(sprintf($this->_("Wasn’t able to create action/view '%s' for controller '%s'."), $action, $controller_name));
+				}
+				$template = $this->templates->get($template_id);
+				$template->altFilename = self::TEMPLATE_FILENAME;
+				$template->fields->save();
+				$template->urlSegments = 1;
+				$template->save();
+				$path = $this->config->paths->templates;
+				$this->session->message(sprintf($this->_("Added %s as alternative template filename to template '%s'."), self::TEMPLATE_FILENAME, $template->name));
+				$this->session->message(sprintf($this->_("Allowed urlSegments for template '%s'."), $template->name));
+				$this->session->message(sprintf($this->_("Created action methods '%s' in '%s'."), implode("', '", $actions), $template_name));
+				$this->session->redirect('./'.$template_name.'/');
+			}
+			return $wrapper->render();
+		}else{
+			$form = new InputfieldForm();
+			$form->attr('method', 'post');
+			$form->attr('action', './');
+			// select field for templates
+			$field = new InputfieldSelect();
+			$field->label = $this->_("Create Controller for Template");
+			$field->name = 'template';
+			foreach($this->templates as $t){
+				if(!($t->altFilename == self::TEMPLATE_FILENAME)) {
+					$field->addOption($t->id, $t->name);
+				}
+			}
+			$form->append($field);
+			// field for predefined actions
+			$field = new InputfieldText();
+			$field->name = 'actions';
+			$field->label = $this->_("Predefined Actions");
+			$field->description = $this->_("Names of action methods to be created within the controller. List separated by commas.");
+			$form->add($field);
+			// submit button
+			$submit = $this->modules->get('InputfieldSubmit');
+			$submit->attr('name', 'controller_create');
+			$submit->attr('id', 'submit_create_top');
+			$submit->attr('value', $this->_("Create"));
+			$form->append($submit);
+			return $form->render();
+		}
+	}
+
+	public function _renderControllerViews(){
+		if(isset($this->input->urlSegment2)){
+			$template_name = $this->sanitizer->text($this->input->urlSegment2);
+			$controller_class = $this->get_controller_classname($template_name, false);
+			$controller_class_ns = $this->get_controller_classname($template_name);
+			$controller_file = $this->get_controller_filename($controller_class);
+			$controller_path = $this->paths->controllers . $controller_file . self::ext('controllers');
+
+			$this->setFuel('processHeadline', sprintf("%s: %s", self::MODULE_NAME, $controller_class));
+			$breadcrumbs = wire('breadcrumbs');
+			$breadcrumbs->add(new Breadcrumb($this->page->url, $this->page->title));
+			if(file_exists($controller_path)){
+				include($controller_path);
+				if(class_exists($controller_class_ns)){
+					$class = $controller_class;
+					$child_methods = $this->_get_controller_methods($class);
+			   	$table = $this->modules->get("MarkupAdminDataTable");
+			    $header = array(
+						$this->_x('View', 'list-thead'),
+						$this->_x('File', 'list-thead'),
+						$this->_x('Created', 'list-thead')
+					);
+					$table->headerRow($header);
+				    foreach($child_methods as $view){
+				    	$view_file = $view . self::ext('views');
+				    	$view_path = $this->paths->views . $controller_file . "/" . $view_file;
+				    	if(file_exists($view_path)){
+				    		$view_exists = $this->_("Created");
+				    	}else{
+				    		$view_exists = $this->_("File Missing");
+				    	}
+				    	$table->row(array($view, $view . $this->ext('views'), $view_exists));
+				    }
+				    $form = new InputfieldForm();
+				    $field = new InputfieldMarkup();
+				    $field->label = 'Views for ' . $controller_class;
+				    $field->attr('value', $table->render());
+				    $form->append($field);
+
+						$submit = $this->modules->get('InputfieldButton');
+						$submit->attr('href', './view/');
+						$submit->attr('class', $submit->attr('class') . ' head_button_clone');
+						$submit->attr('name', 'controller_new');
+						$submit->attr('value', $this->_('Create View'));
+						$form->add($submit);
+				    return $form->render();
+
+				} else {
+					return $this->_("Controller doesn’t exist");
+				}
+			} else {
+				return sprintf($this->_("No controller file found for '%s' in '%s'"), $controller_class, $controller_path);
+			}
+		}
+	}
+
+	private function _renderControllerViewNew(){
+		$this->setFuel('processHeadline', sprintf('%s: %s', self::MODULE_NAME, $this->_('Create View')));
+
+		if((isset($this->input->urlSegment2)) && ($controller_name = $this->sanitize_controller_name($this->input->urlSegment2))) {
+			$breadcrumbs = wire('breadcrumbs');
+			$breadcrumbs->add(new Breadcrumb($this->page->url, $this->page->title));
+			$breadcrumbs->add(new Breadcrumb('../', $controller_name));
+			// get controller’s view path©
+			if(!($controller_views_dir = $this->get_controller_filename($controller_name))) throw new WireException(sprintf($this->_("'$s' is not a valid controller name.")));
+
+			if($_SERVER['REQUEST_METHOD'] == 'POST'){
+				$view_name = $this->input->post->view_name;
+				// check if view name is valid
+				if((!$view_name) || (!preg_match("#^[a-z0-9_]+$#i", $view_name))) {
+					if(strlen($view_name)) {
+						$this->session->error(sprintf($this->_("'%s' is not a valid view name."), $view_name));
+					} else {
+						$this->session->error($this->_("Please enter a valid view name."));
+					}
+					$this->session->redirect('./');
+				}
+				$view_path = $this->paths->views . $controller_views_dir . "/";
+				// create view dir for controller, if not existing
+				if($this->validate_dir($view_path)) {
+					$this->_create_view_file($controller_name, $view_name);
+					$this->session->redirect('../');
+				} else {
+					throw new WireException($this->_("No controller name given."));
+				}
+			}else{
+				$form = new InputfieldForm();
+				$form->action .= './';
+				$form->method = 'post';
+				// field view name
+				$field = new InputfieldText();
+				$field->label = $this->_("View Name");
+				$field->name = 'view_name';
+				$field->set('required', true);
+				$form->append($field);
+
+				$field = new InputfieldSubmit();
+				$field->attr("value", $this->_("Create View"));
+				$form->append($field);
+				return $form->render();
+			}
+		} else {
+			throw new WireException(sprinf($this->_("Error, no controller name passed")));
+			return false;
+		}
+	}
+
+	/**
+	 * Request setup
+	 */
+	// init new request
+	private function _request_init(&$page) {
+		$new_request = array_merge(array(), $this->request);
+		$request_id = count($this->requests);
+		$this->requests[] = $new_request;
+		$this->requests[$request_id]['page'] = $page;
+		return $request_id;
+	}
+
+	// set up controller
+  private function _request_set_controller($request_id, $controller_name) {
+    if(!$this->_request_id_valid($request_id)) return false;
+    $controller_class = $this->sanitize_controller_name($controller_name) . 'Controller';
+    $controller_class_ns = self::NS . "\\" . $controller_class;
+    $controller_file = $this->get_controller_filename($controller_class);
+    $controller_path = $this->paths->controllers . $controller_file . self::ext('controllers');
+    // check if controller file exists
+    if(!file_exists($controller_path)) {
+      $this->requests[$request_id]['errors'][] = sprintf($this->_("Controller file '%s' doesn’t exist."), $controller_path);
+      return false;
+    }
+    // include and init controller
+    $this->requests[$request_id]['controller_path'] = $controller_path;
+    require_once($controller_path);
+    if(!class_exists($controller_class_ns)) {
+      $this->requests[$request_id]['errors'][] = sprintf($this->_("Controller '%s' can’t be initialized."), $controller_class);
+      return false;
+    }
+    $this->requests[$request_id]['controller'] = new $controller_class_ns($this->requests[$request_id]['scope']);
+    return true;
+  }
+
+	// check and set action
+	private function _request_set_action($request_id, $action) {
+		if(!$this->_request_id_valid($request_id)) return false;
+		if($this->requests[$request_id]['controller'] == null) {
+			$this->requests[$request_id]['errors'][] = $this->_("Tried to set action before controller was initialized.");
+			return false;
+		}
+		if(!method_exists($this->requests[$request_id]['controller'], $action)) {
+			$this->requests[$request_id]['errors'][] = sprintf($this->_("Action '%s' isn’t defined in controller '%s'."), $action, $this->sanitize_controller_name($this->request['controller_path']));
+			return false;
+		}
+		$this->requests[$request_id]['action'] = $action;
+		return true;
+	}
+
+	// check and set view
+	private function _request_set_view($request_id) {
+		if(!$this->_request_id_valid($request_id)) return false;
+		$action = $this->requests[$request_id]['action'];
+		if(!$action) {
+			$this->requests[$request_id]['errors'][] = $this->_("Tried to set view with no action been set.");
+			return false;
+		}
+		$controller_name = $this->get_class($this->requests[$request_id]['controller'], false);
+		$view_file = $this->paths->views . $this->get_controller_filename($controller_name) . '/' . $action . self::ext('views');
+		$this->requests[$request_id]['view_file'] = $view_file;
+		return true;
+	}
+
+	// set default layout, if not set in controller
+	private function _request_set_layout($request_id) {
+		if(!$this->_request_id_valid($request_id)) return false;
+		$layout = $this->requests[$request_id]['controller']->get_layout();
+		if($layout !== NULL) {
+			$this->requests[$request_id]['layout_file'] = $this->paths->layouts . $layout . $this->ext('layouts');
+		} else {
+			if($this->page->get('embedded')) {
+				$this->requests[$request_id]['layout_file'] = null;
+			} else {
+				$this->requests[$request_id]['layout_file'] = $this->paths->layouts . $this->default_layout . $this->ext('layouts');
+			}
+		}
+		return true;
+	}
+
+	// set scope var
+	private function _request_set_var($request_id, $var, $val, $scope='root') {
+		if(!$this->_request_id_valid($request_id)) return false;
+		if(!array_key_exists($scope, $this->requests[$request_id]['scope'])) return false;
+		$this->requests[$request_id]['scope'][$scope][$var] = $val;
+		return true;
+	}
+
+	// set scope var
+	private function &_request_get_var($request_id, $var, $scope='root') {
+		if(!$this->_request_id_valid($request_id)) return false;
+		if(!array_key_exists($scope, $this->requests[$request_id]['scope'])) return false;
+		return $this->requests[$request_id]['scope'][$scope][$var];
+	}
+
+	// display request errors
+	private function _request_show_errors($request_id) {
+		if(!$this->_request_id_valid($request_id)) return false;
+		$errors = $this->requests[$request_id]['errors'];
+		throw new WireException(sprintf($this->_("There went something wrong: %s"), implode("<br />" . PHP_EOL, $errors)));
+	}
+
+	// build scope
+	private function _request_build_scope($request_id) {
+		if(!$this->_request_id_valid($request_id)) return false;
+		$scope = array();
+		foreach($this->fuel as $var => $val) {
+			$scope[$var] =& $this->$var;
+		}
+		$this->requests[$request_id]['scope']['fuel'] = $scope;
+
+	}
+
+	// check request id
+	private function _request_id_valid($request_id) {
+		return array_key_exists($request_id, $this->requests);
+	}
+
+	/**
+	 *	Page rendering
+	 */
+	public function process(Page $page, $force_action = false, $embed = false) {
+		//$page = $event->object;
+		$template = $page->template;
+		// init request
+		$request_id = $this->_request_init($page);
+		$page->set('request_id', $request_id);
+		$request =& $this->requests[$request_id];
+		if($template->altFilename == self::TEMPLATE_FILENAME) {
+			// PWVC is enabled for this template and therefor page is being processed
+			// start setting up request data for rendering
+			$this->_request_build_scope($request_id);
+			if($this->_request_set_controller($request_id, $page->template->name)) {
+				$action = $request['controller']->get_action($force_action);
+				if($this->_request_set_action($request_id, $action)) {
+					if($this->_request_set_view($request_id)) {
+						if(!$embed)
+							$this->_request_set_layout($request_id);
+						$out = $this->_render($request_id, $embed);
+
+					}
+				}
+			}
+			// if errors happened, show them
+			if(count($this->requests[$request_id]['errors']) > 0) {
+				if($this->config->debug) {
+					ob_start();
+					$this->_request_show_errors($request_id);
+					$out = ob_get_contents();
+					ob_end_clean();
+				}
+				else
+					throw new PageNotFoundException();
+			}
+			return $out;
+		}
+	}
+
+	/**
+	 * Rendering
+	 */
+	private function _render($request_id, $embed=false) {
+		if(!$this->_request_id_valid($request_id)) return false;
+		$request =& $this->requests[$request_id];
+		// execute action of controller
+		$controller = $this->_get_controller($request_id);
+		$action = $this->requests[$request_id]['action'];
+		$controller->$action();
+
+		// start renderer process
+		if(!$embed) {
+			$this->renderer->init($request);
+			$renderer =& $this->renderer;
+		}
+		else {
+			$renderer_class = get_class($this->renderer);
+			$renderer = new $renderer_class();
+			$renderer->init($request);
+		}
+		$out = $renderer->render($request);
+		/*
+		// add methods to Page
+		$this->hooks['get_block'] = $this->addHook('Page::get_block', $this, 'render_get_block');
+		$this->hooks['get_snippets'] = $this->addHook('Page::get_snippet', $this, 'render_get_snippet');
+
+		// proceed to rendering
+		if($this->use_twig) {
+			$out = $this->_render_twig($request_id);
+		} else {
+			$out = $this->_render_native($request_id);
+		}*/
+		if(!$out) {
+			// error rendering failed
+		}
+		return $out;
+	}
+
+	// get template file for request
+	private function _render_get_templatefile($request_id, $path, array $scope=array()) {
+		if(!file_exists($path)) return false;
+		$template = new TemplateFile($path);
+		$template->set('scope', $scope);
+		foreach($scope as $var => $val) {
+			$template->set($var, $val);
+		}
+		return $template;
+	}
+
+	// hook methods for getting template blocks
+	public function render_get_block($request_id, $block_name=null) {
+		if(is_object($request_id)) {
+			if(!$request_id instanceof HookEvent) return false;
+			$event = $request_id;
+			$page = $event->object;
+			$request_id = $page->get('request_id');
+			$block_name = $event->arguments[0];
+		}
+		if(!$this->_request_id_valid($request_id)) return false;
+		if($controller = $this->_get_controller($request_id)) {
+			return $controller->get_block($block_name);
+		}
+	}
+
+	/**
+	 * Path and filesystem helpers
+	 */
+
+	// Set default dir after checking it’s existence. Create if not existing
+	private function _get_default_path($key) {
+		if(!$rel_path = $this->get($key)) {
+			$rel_path = self::$defaults[$key];
+		}
+		$path = $this->clean_path($this->config->paths->root . $rel_path);
+		return $this->validate_dir($path, false);
+	}
+
+	// Check if dir is valid. If it doesn’t exist, create it.
+	public static function validate_dir($path, $clean=true) {
+		if($clean) $path = self::clean_path($path);
+		if((!is_dir($path)) && (!mkdir($path))) {
+			throw new WireException(sprintf(__("Directory '%s' wasn’t found and coundn’t be created."), $path));
+		}
+		return $path;
+	}
+
+	// beautify path string
+	public static function clean_path($path) {
+		$path = isset($this)?$this->config->paths->normalizeSeparators($path):wire('config')->paths->normalizeSeparators($path);
+		return str_replace("//", "/", rtrim($path, "/") . "/");
+	}
+
+	// get paths relative to template directory
+	public static function get_rel_path($path, $rel_to=null, $prep_slash=false) {
+		if(isset($this)) {
+			// in object context
+			$config = &$this->config;
+		} else {
+			// in static context
+			$config = wire('config');
+		}
+		if(!$rel_to) $rel_to = $config->paths->root;
+		if(preg_match("#^".preg_quote($config->paths->templates)."(.*)$#", $path, $match)) {
+			return ($prep_slash?"/":"") . rtrim($match[1]);
+		} else {
+			return false;
+		}
+	}
+
+	// Check, if dir is empty
+	public static function is_dir_empty($path) {
+	  if (!is_readable($path)) return NULL;
+	  $handle = opendir($path);
+	  while ($f = readdir($handle)) {
+	    if ($f != "." && $f != "..") {
+	      return false;
+	    }
+	  }
+	  return true;
+	}
+
+	/**
+	 * Helpers for files, filenames
+	 */
+
+	// Get file extension
+	public static function ext($type, $renderer=null) {
+		$renderer_class = wire('pwvc')->renderer;
+		if(!$renderer_class) $renderer_class = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
+		return $renderer_class::ext($type);
+	}
+
+	// Create a controller file
+  private function _create_controller_file($controller_name, $actions=array()) {
+    if(!($controller_filename = $this->get_controller_filename($controller_name))) return false;
+    $controller_path = $this->paths->controllers . $controller_filename . self::ext('controllers');
+    if(!file_exists($controller_path)) {
+      if($controller_file = fopen($controller_path, 'w')) {
+        fwrite($controller_file,    "<?php\n"
+                                   ."namespace ".self::NS.";\n\n"
+                                   ."class ".$controller_name."Controller extends AppController {\n\n");
+        foreach($actions as $action) {
+          fwrite($controller_file, "\tpublic function {$action}() {\n"
+                                  ."\t\t\n"
+                                  ."\t}\n\n");
+        }
+        fwrite($controller_file,   "}\n"
+                                  ."?>");
+        fclose($controller_file);
+      } else {
+        throw new WireException(sprintf($this->_("Wasn’t able to create file '%s' for controller '%s'."), $controller_path, $controller_name));
+      }
+    }
+    return $controller_path;
+  }
+
+	// Create a view file
+	private function _create_view_file($controller_name, $view_name) {
+		if(!($controller_views_dir = $this->get_controller_filename($controller_name))) return false;
+		// determine controller’s view path
+		$view_path = $this->paths->views . $controller_views_dir . "/";
+		if(!($this->validate_dir($view_path))) return false;
+		$view_path .= $view_name . self::ext('views');
+		if(!file_exists($view_path)) {
+			if($view_file = fopen($view_path, 'w')) {
+				fwrite($view_file,	"<!-- View '{$view_name}' of controller '{$controller_name}' -->");
+				fclose($view_file);
+				$this->session->message(sprintf($this->_("View '%s' created."), $view_name));
+			} else {
+				throw new WireException(sprintf($this->_("Wasn’t able to create file for view '%s' of controller '%s'."), $view_name, $controller_name));
+			}
+		} else {
+			$this->session->message(sprintf($this->_("File for view '{$view_name}' of controller '%s' already exists."), $controller_name));
+		}
+		return $view_path;
+	}
+
+	// Sanitize controller name
+	public static function sanitize_controller_name($name) {
+		if(preg_match("#[/\\\]#", $name)) {
+			// May be a path. Deal with it.
+			$name = basename($name, self::ext('controllers'));
+		}
+		$name = preg_replace("#[-_]#", "-", $name);
+		$parts = explode('-', $name);
+		array_walk($parts, create_function('&$val', '$val = ucfirst(strtolower($val));'));
+
+		$controller_name = implode('', $parts);
+		if(!preg_match("#^([A-Z][a-z0-9]+)+$#", $controller_name)) return false;
+		return $controller_name;
+	}
+
+	// Get filename from controller name
+	public static function get_controller_filename($controller_name) {
+		if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#Controller$#", '', $controller_name), $matches)) {
+			$filename = strtolower(implode('_', $matches[1]));
+			return $filename;
+		} else {
+			return false;
+		}
+	}
+
+	// Get controller class name with or without namespace
+	public static function get_controller_classname($name, $ns=true) {
+		if(is_object($name)) return $this->get_class($name, $ns);
+		$class_name = ($ns ? self::NS . "\\" : "") . self::sanitize_controller_name($name) . 'Controller';
+		return $class_name;
+	}
+
+	// Get class name for object with or without namespace
+	public static function get_class($controller, $ns=true) {
+		$class = get_class($controller);
+		return $ns ? $class : substr($class, strpos($class, "\\")+1);
+	}
+
+	// Get array of controller method names
+  private function _get_controller_methods($class) {
+    $methods = array();
+    $class_ns = self::NS . "\\" . $class;
+    if(!class_exists($class_ns)) {
+      $controller_file = $this->get_controller_filename($class);
+      $controller_path = $this->paths->controllers . $controller_file . self::ext('controllers');
+      if((!require_once($controller_path)) && (!class_exists($class))) {
+        return false;
+      }
+    }
+    do {
+      $reflection = new ReflectionClass($class_ns);
+      foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+        if ($method->class == $reflection->getName()) {
+          $methods[] = $method->name;
+        }
+      }
+      $class_ns = get_parent_class($class_ns);
+      $class = ltrim($class_ns, self::NS . "\\");
+      $namespace = $reflection->getNamespaceName();
+    } while(($namespace == self::NS) && ($class != 'AppController' && $class != 'Controller'));
+    return $methods;
+  }
+
+	// Get controller instance for request_id
+	private function _get_controller($request_id) {
+		if(!array_key_exists($request_id, $this->requests)) return false;
+		$controller = &$this->requests[$request_id]['controller'];
+		$instanceof = self::NS . '\\Controller';
+		return ($controller instanceof $instanceof)?$controller:false;
+	}
+
+	// set up renderer
+	private function _init_renderer($renderer_name) {
+		if(!is_string($renderer_name)) return false;
+		$renderer_class = 'PwvcRenderer' . $renderer_name;
+		if(!class_exists($renderer_class)) {
+			$renderer_path = $this->clean_path(dirname(__FILE__));
+			require($renderer_path . $renderer_class . '.php');
+		}
+		if(!class_exists($renderer_class)) return false;
+
+		$renderer = new $renderer_class();
+		$this->renderer = $renderer;
+		return true;
+	}
+
+	// returns current template engine
+	public function get_renderer() {
+		return $this->renderer;
+	}
+
+	// returns config values of module
+	public static function get_config_value($key) {
+		if(isset($this)) {
+			if($this->$key) return $this->key;
+		} else {
+			$modules = wire('modules');
+			$module_config = $modules->getModuleConfigData(__CLASS__);
+			if(array_key_exists($key, $module_config)) return $module_config[$key];
+    }
+    return false;
+	}
+}

@@ -1,0 +1,590 @@
+<?php
+/**
+ * PWvc Core Module Class V. 0.1.0
+ * Part of PWvc, a module for ProcessWire 2.3+
+ *
+ * by Oliver Wehn
+ * https://github.com/oliverwehn
+ *
+ * originally inspired by MVC Module by Harmster
+ * https://github.com/Hawiak
+ * hawiak.nl
+ *
+ * Core class takes care of routing requests to their
+ * associated controllers and actions
+ *
+ */
+require_once('PwvcObject.php');
+require_once('PwvcStack.php');
+require_once('PwvcModel.php');
+require_once('PwvcView.php');
+require_once('PwvcController.php');
+require_once('PwvcRenderer.php');
+
+class PwvcCore extends WireData implements Module, ConfigurableModule {
+
+  const PERMISSION_NAME = 'pwvc-admin';
+  const MODULE_NAME = 'PWvc';
+  const TEMPLATE_FILENAME = 'pwvc';
+  const DEFAULT_LAYOUT = 'layout';
+  const DEFAULT_RENDERER = 'Native';
+  const APP_CONTROLLER = 'AppController.php';
+  const NS = 'PWvc';
+
+  private static
+        $defaults = array(
+                    'app_controller_path' => 'site/templates/',
+                    'layouts_path' => 'site/templates/layouts/',
+                    'models_path' => 'site/templates/models/',
+                    'controllers_path' => 'site/templates/controllers/',
+                    'views_path' => 'site/templates/views/',
+                    'snippets_path' => 'site/templates/snippets/',
+                    'assets_path' => 'site/templates/assets/',
+                    'scripts_markup' => '<script src="%s"></script>',
+                    'styles_markup' => '<link rel="stylesheet" href="%s">',
+                    'renderer_name' => self::DEFAULT_RENDERER
+                    );
+
+  public static function getModuleInfo(){
+    return array(
+      'title' => 'PWvc Core',
+      'summary' => __('Stands for ProcessWire-Module-View. A module that implements MVC’ish template processing.'),
+      'autoload' => true,
+      'version' => 100,
+      'author' => 'Oliver Wehn',
+      'href' => 'https://github.com/oliverwehn/PWvc',
+      'singular' => true,
+      //'installs' => 'ProcessPwvc'
+    );
+  }
+
+  public function __construct() {
+
+  }
+
+  public function init() {
+    // set global pwvc var
+    Wire::setFuel('pwvc', $this);
+
+    $this->addHookBefore('PageRender::renderPage', $this, 'renderPage');
+
+    // set up renderer
+    if(!$this->cfg_renderer_name) {
+      $this->cfg_renderer_name = self::DEFAULT_RENDERER;
+    }
+    if(!$this->_init_renderer($this->cfg_renderer_name)) {
+      throw new WireException(sprintf($this->_("Failed loading renderer '%s'"), $this->cfg_renderer_name));
+    }
+
+    // set relative template dir
+    $this->templates_rel_path = str_replace($this->config->paths->root, '', $this->config->paths->templates);
+
+    // set up default paths from config
+    $pwvc_paths = new Paths($this->config->paths->get('root'));
+    $pwvc_urls = new Paths($this->config->urls->templates);
+    $pwvc_paths->set('app_controller', $this->_get_default_path('app_controller'));
+    $pwvc_paths->set('models', $this->_get_default_path('models'));
+    $pwvc_paths->set('views',  $this->_get_default_path('views'));
+    $pwvc_paths->set('controllers', $this->_get_default_path('controllers'));
+    $pwvc_paths->set('layouts', $this->_get_default_path('layouts'));
+    $pwvc_paths->set('snippets', $this->_get_default_path('snippets'));
+    $pwvc_paths->set('assets', $this->_get_default_path('assets'));
+    $pwvc_urls->set('assets', $this->get_rel_path($pwvc_paths->get('assets'), $this->config->urls->templates));
+    $pwvc_paths->set('styles', $this->validate_dir($pwvc_paths->get('assets') . 'styles/'));
+    $pwvc_urls->set('styles', $this->get_rel_path($pwvc_paths->get('styles'), $this->config->urls->templates));
+    $pwvc_paths->set('scripts', $this->validate_dir($pwvc_paths->get('assets') . 'scripts/'));
+    $pwvc_urls->set('scripts', $this->get_rel_path($pwvc_paths->get('scripts'), $this->config->urls->templates));
+    $pwvc_paths->set('images', $this->validate_dir($pwvc_paths->get('assets') . 'images/'));
+    $pwvc_urls->set('images', $this->get_rel_path($pwvc_paths->get('images'), $this->config->urls->templates));
+    $this->set('paths', $pwvc_paths);
+    $this->set('urls', $pwvc_urls);
+    if($this->paths->app_controller == "")
+      $app_controller = $this->config->paths->templates . self::APP_CONTROLLER;
+    else
+      $app_controller = $this->paths->app_controller . self::APP_CONTROLLER;
+    // include AppController class
+    require_once($app_controller);
+  }
+
+  /**
+   * Replaces method renderPage in PageRender module
+   * @method renderPage
+   * @param $event Event Object
+   * @return null
+   */
+  public function renderPage($event) {
+    $page = $event->arguments[0]->object;
+    $stack = new PWvc\PwvcStack($page);
+    $module = $event->object;
+    $event->object = $stack;
+    $event->replace = true;
+    $event->return = $module->___renderPage($event);
+  }
+
+  /**
+   * Request setup
+   */
+  // init new request
+  private function _request_init(&$page) {
+    $new_request = array(
+      'Controller' => null,
+      'Route' => '/',
+      'Scope' => array()
+    );
+    $request_id = count($this->requests);
+    $this->requests[] = $new_request;
+    $this->requests[$request_id]['page'] = $page;
+    return $request_id;
+  }
+
+  // set up controller
+  private function _init_controller($controller_name, &$errors) {
+    $controller_class = $this->sanitize_controller_name($controller_name, true);
+    $controller_class_ns = self::NS . "\\" . $controller_class;
+    if(!class_exists($controller_class_ns)) {
+      $controller_file = $this->get_controller_filename($controller_class);
+      $controller_path = $this->paths->controllers . $controller_file . self::ext('controllers');
+      // check if controller file exists
+      if(!file_exists($controller_path)) {
+        $errors[] = sprintf($this->_("Controller file '%s' doesn’t exist."), $controller_path);
+        return false;
+      }
+      // include controller class
+      require_once($controller_path);
+    }
+    if(!class_exists($controller_class_ns)) {
+      $errors[] = sprintf($this->_("Controller '%s' can’t be initialized."), $controller_class);
+      return false;
+    }
+    return new $controller_class_ns();
+  }
+
+
+  // check and set action
+  private function _request_set_action($request_id, $action) {
+    if(!$this->_request_id_valid($request_id)) return false;
+    if($this->requests[$request_id]['controller'] == null) {
+      $this->requests[$request_id]['errors'][] = $this->_("Tried to set action before controller was initialized.");
+      return false;
+    }
+    if(!method_exists($this->requests[$request_id]['controller'], $action)) {
+      $this->requests[$request_id]['errors'][] = sprintf($this->_("Action '%s' isn’t defined in controller '%s'."), $action, $this->sanitize_controller_name($this->request['controller_path']));
+      return false;
+    }
+    $this->requests[$request_id]['action'] = $action;
+    return true;
+  }
+
+  // display request errors
+  private function _show_errors($errors) {
+    throw new WireException(sprintf($this->_("There went something wrong: %s"), implode("<br />" . PHP_EOL, $errors)));
+  }
+
+  // build scope
+  private function _request_build_scope($request_id) {
+    if(!$this->_request_id_valid($request_id)) return false;
+    $scope = array();
+    foreach($this->fuel as $var => $val) {
+      $scope[$var] =& $this->$var;
+    }
+    $this->requests[$request_id]['scope']['fuel'] = $scope;
+
+  }
+
+  /**
+   * Process request
+   */
+  public function process(Page $page, $options) {
+    $template = $page->template;
+    $errors = array();
+
+    if($template->altFilename == self::TEMPLATE_FILENAME) {
+      // PWVC is enabled for this template and therefor page is being processed
+      // start setting up request data for rendering
+      if($stack = $this->_init_stack($page->template->name, $errors)) {
+        $render_settings = $controller->execute($options);
+        // start renderer process
+        $renderer =& $this->renderer;
+        $renderer->init($render_settings);
+
+        $out = $renderer->render();
+
+        if(!$out) {
+          // error rendering failed
+        }
+        return $out;
+      }
+      // if errors happened, show them
+      if(count($errors) > 0) {
+        if($this->config->debug) {
+          ob_start();
+          $this->_show_errors($errors);
+          $out = ob_get_contents();
+          ob_end_clean();
+        }
+        else
+          throw new PageNotFoundException();
+      }
+      return $out;
+    }
+  }
+
+  /**
+   * Determine route
+   */
+  public function get_route($action = NULL) {
+    $route = '/';
+    if($this->validate_action($action)) {
+      if($action !== self::DEFAULT_ACTION) {
+        if(strpos($action, '_'))
+          $action = implode('/', explode('_', $action));
+        $route .= $action . '/';
+      }
+    } else {
+      // get route from urlSegements
+      $i = 0;
+      $route_segments = array();
+      while(isset($this->input->urlSegments[$i+1])) {
+        $i++;
+        $route_segments[] = $this->input->urlSegments[$i];
+      }
+      if($i > 0)
+        $route .= implode('/', $route_segments) . '/';
+    }
+    return $route;
+  }
+
+  /**
+   * Handling renderer
+   */
+  // set up renderer
+  private function _init_renderer($renderer_name) {
+    if(!is_string($renderer_name)) return false;
+    $renderer_class = 'PwvcRenderer' . $renderer_name;
+    $renderer_class_ns = 'PWvc\\' . $renderer_class;
+    if(!class_exists($renderer_class_ns)) {
+      $renderer_path = $this->clean_path(dirname(__FILE__));
+      require_once($renderer_path . $renderer_class . '.php');
+    }
+    if(!class_exists($renderer_class_ns)) return false;
+
+    $renderer = new $renderer_class_ns();
+    $this->renderer = $renderer;
+    return true;
+  }
+
+  // returns current template engine
+  public function get_renderer() {
+    return $this->renderer;
+  }
+
+
+  /**
+   * Handling files and paths
+   */
+  // Set default dir after checking it’s existence. Create if not existing
+  private function _get_default_path($key) {
+    if(!$rel_path = $this->get('cfg_' . $key . '_path')) {
+      $rel_path = self::$defaults[$key . '_path'];
+    }
+    $path = $this->clean_path($this->config->paths->root . $rel_path);
+    return $this->validate_dir($path, false);
+  }
+
+  // Check if dir is valid. If it doesn’t exist, create it.
+  public static function validate_dir($path, $clean=true) {
+    if($clean) $path = self::clean_path($path);
+    if((!is_dir($path)) && (!mkdir($path))) {
+      throw new WireException(sprintf(__("Directory '%s' wasn’t found and coundn’t be created."), $path));
+    }
+    return $path;
+  }
+
+  // beautify path string
+  public static function clean_path($path) {
+    $path = isset($this)?$this->config->paths->normalizeSeparators($path):wire('config')->paths->normalizeSeparators($path);
+    return str_replace("//", "/", rtrim($path, "/") . "/");
+  }
+
+  // get paths relative to template directory
+  public static function get_rel_path($path, $rel_to=null, $prep_slash=false) {
+    if(isset($this)) {
+      // in object context
+      $config = &$this->config;
+    } else {
+      // in static context
+      $config = wire('config');
+    }
+    if(!$rel_to) $rel_to = $config->paths->root;
+    if(preg_match("#^".preg_quote($config->paths->templates)."(.*)$#", $path, $match)) {
+      return ($prep_slash?"/":"") . rtrim($match[1]);
+    } else {
+      return false;
+    }
+  }
+
+  // Check, if dir is empty
+  public static function is_dir_empty($path) {
+    if (!is_readable($path)) return NULL;
+    $handle = opendir($path);
+    while ($f = readdir($handle)) {
+      if ($f != "." && $f != "..") {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Helpers for files, filenames
+   */
+
+  // Get file extension
+  public static function ext($type, $renderer=null) {
+    $renderer_class = wire('pwvc')->renderer;
+    if(!$renderer_class) $renderer_class = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
+    $renderer_class_ns = 'PWvc\\' . $renderer_class;
+    $exts = array(
+      'models' => '.model.php',
+      'controllers' => '.controller.php',
+      'layouts' => '.layout.php',
+      'views' => '.view.php',
+      'snippets' => '.snippet.php'
+    );
+    return $exts[$type];
+    return $renderer_class_ns::ext($type);
+  }
+
+
+
+  // Sanitize controller name
+  public static function sanitize_classname($template_name, $suffix='', $ns=true) {
+    $suffix = is_string($suffix) ? self::camelcase($suffix) : '';
+    $class_name = self::camelcase($template_name) . $suffix;
+    if($ns) $class_name = self::NS . "\\" . $class_name;
+    return $class_name;
+  }
+
+  // Camelcase it
+  public static function camelcase($str) {
+    $str = preg_replace("#[-_]#", "-", $str);
+    $parts = explode('-', $str);
+    array_walk($parts, create_function('&$val', '$val = ucfirst(strtolower($val));'));
+    $camelcase = implode('', $parts);
+    if(preg_match("#^([A-Z][a-z0-9]+)+$#", $camelcase)) return $camelcase;
+    else throw new \WireException(sprintf(_('Wasn’t able to camel case template name. Resulted in "%s".'), $camelcase));
+  }
+
+  // Get filename from classname
+  public static function get_class_filename($class_name) {
+    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#^PWvc\\\#", '',$class_name), $matches)) {
+      array_pop($matches[1]);
+      $filename = strtolower(implode('_', $matches[1]));
+      return $filename;
+    } else {
+      return false;
+    }
+  }
+
+  // Sanitize controller name
+  public static function sanitize_controller_name($name, $class=false) {
+    if(preg_match("#[/\\\]#", $name)) {
+      // May be a path. Deal with it.
+      $name = basename($name, self::ext('controllers'));
+    }
+    $name = preg_replace("#[-_]#", "-", $name);
+    $parts = explode('-', $name);
+    array_walk($parts, create_function('&$val', '$val = ucfirst(strtolower($val));'));
+
+    $controller_name = implode('', $parts);
+    if(!preg_match("#^([A-Z][a-z0-9]+)+$#", $controller_name)) return false;
+    return $controller_name . ($class ? 'Controller' : '');
+  }
+
+  // Get filename from controller name
+  public static function get_controller_filename($controller_name) {
+    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#Controller$#", '', preg_replace("#^PWvc\\\#", '',$controller_name)), $matches)) {
+      $filename = strtolower(implode('_', $matches[1]));
+      return $filename;
+    } else {
+      return false;
+    }
+  }
+
+  // Get controller class name with or without namespace
+  public static function get_controller_classname($name, $ns=true) {
+    if(is_object($name)) return $this->get_class($name, $ns);
+    $class_name = ($ns ? self::NS . "\\" : "") . self::sanitize_controller_name($name) . 'Controller';
+    return $class_name;
+  }
+
+  // Get class name for object with or without namespace
+  public static function get_class($controller, $ns=true) {
+    $class = get_class($controller);
+    return $ns ? $class : substr($class, strpos($class, "\\")+1);
+  }
+
+  // Get array of controller method names
+  private function _get_controller_methods($class) {
+    $methods = array();
+    $class_ns = self::NS . "\\" . $class;
+    if(!class_exists($class_ns)) {
+      $controller_file = $this->get_controller_filename($class);
+      $controller_path = $this->paths->controllers . $controller_file . self::ext('controllers');
+      if((!require_once($controller_path)) && (!class_exists($class))) {
+        return false;
+      }
+    }
+    do {
+      $reflection = new ReflectionClass($class_ns);
+      foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+        if ($method->class == $reflection->getName()) {
+          $methods[] = $method->name;
+        }
+      }
+      $class_ns = get_parent_class($class_ns);
+      $class = ltrim($class_ns, self::NS . "\\");
+      $namespace = $reflection->getNamespaceName();
+    } while(($namespace == self::NS) && ($class != 'AppController' && $class != 'Controller'));
+    return $methods;
+  }
+
+  /**
+   * Configuration
+   */
+
+   // Module configuration form
+
+
+/**
+ * Configuration
+ */
+  static public function getModuleConfigInputfields(array $data) {
+    $pwvc = wire('pwvc');
+
+    $form = new InputfieldForm();
+    $form->attr('id', 'pwvc-config');
+    $wrapper = new InputfieldWrapper();
+    $wrapper->label = __("General Configuration");
+
+    // config
+    $config = wire('config');
+
+    // relative template dir
+    $templates_rel_path = str_replace($config->paths->root, '', $config->paths->templates);
+
+    // field for name of default layout file
+    $field_value = isset($data['cfg_default_layout']) ? $data['cfg_default_layout'] : self::DEFAULT_LAYOUT_NAME;
+    $cfg_default_layout = $field_value . self::ext('layouts');
+    $field = new InputfieldText();
+    $field->label = 'Default layout file (php file in your layouts folder)';
+    $field->attr('name+id', 'cfg_default_layout');
+    $field->description = file_exists(wire('config')->paths->root . $data['cfg_layouts_path'] . $cfg_default_layout)?sprintf(__("Layout file '%s' was found."), $cfg_default_layout):sprintf(__("Please provide a layout file '%s' in your layout directory '%s'."), $cfg_default_layout, $data['cfg_layouts_path']);
+    $field->value = $field_value;
+    $wrapper->append($field);
+
+    // field for switching template engine
+    $field = new InputfieldSelect();
+    $field->label = 'Default Template Renderer';
+    $field->attr('name+id', 'cfg_renderer_name');
+    $d = dir(dirname(__FILE__));
+    while($f = $d->read()) {
+      if(preg_match("#^PwvcRenderer(([A-Z][a-z]+)+)\.php$#", $f, $match)) {
+        $name = $match[1];
+        $field->addOption($name, null, $data['cfg_renderer_name'] == $name?array('selected'=>'selected'):null);
+      }
+    }
+    $wrapper->append($field);
+
+    $form->append($wrapper);
+
+    // paths
+    $wrapper = new InputfieldWrapper();
+    $wrapper->label = __("Configure file locations");
+
+    // field for layouts path
+    $field = new InputfieldText();
+    $field->label = "Layouts path";
+    $field->attr('name+id', 'cfg_layouts_path');
+    if(isset($data['cfg_layouts_path']) ? $field->value = self::clean_path($data['cfg_layouts_path']) : $field->value = self::$defaults['cfg_layouts_path']);
+    $wrapper->append($field);
+
+    // field for app controller path
+    $field = new InputfieldText();
+    $field->label = 'App Controller folder, where is the App Controller located';
+    $field->attr('name+id', 'cfg_app_controller_path');
+    if(isset($data['cfg_app_controller_path']) ? $field->value = self::clean_path($data['cfg_app_controller_path']) : $field->value = self::$defaults['cfg_app_controller_path']);
+    $wrapper->append($field);
+    $form->append($wrapper);
+
+    // field for controllers path
+    $field = new InputfieldText();
+    $field->label = "Controllers path";
+    $field->attr('name+id', 'cfg_controllers_path');
+    if(isset($data['cfg_controllers_path']) ? $field->value = self::clean_path($data['cfg_controllers_path']) : $field->value = self::$defaults['cfg_controllers_path']);
+    $wrapper->append($field);
+
+    // field for snippets path
+    $field = new InputfieldText();
+    $field->label = "Snippets path";
+    $field->attr('name+id', 'cfg_snippets_path');
+    if(isset($data['cfg_snippets_path']) ? $field->value = self::clean_path($data['cfg_snippets_path']) : $field->value = self::$defaults['cfg_snippets_path']);
+    $wrapper->append($field);
+
+    // field for views path
+    $field = new InputfieldText();
+    $field->label = "Views path";
+    $field->attr('name+id', 'cfg_views_path');
+    if(isset($data['cfg_views_path']) ? $field->value = self::clean_path($data['cfg_views_path']) : $field->value = self::$defaults['cfg_views_path']);
+    $wrapper->append($field);
+    $form->append($wrapper);
+
+    // field for assets path
+    $field = new InputfieldText();
+    $field->label = "Assets path";
+    $field->attr('name+id', 'cfg_assets_path');
+    if(isset($data['cfg_assets_path']) ? $field->value = self::clean_path($data['cfg_assets_path']) : $field->value = self::$defaults['cfg_assets_path']);
+    $wrapper->append($field);
+
+    $form->append($wrapper);
+
+    // paths
+    $wrapper = new InputfieldWrapper();
+    $wrapper->label = __("Markup Templates");
+
+    // field for styles markup
+    $field = new InputfieldText();
+    $field->label = "Styles";
+    $field->attr('name+id', 'cfg_styles_markup');
+    if(isset($data['cfg_styles_markup']) ? $field->value = $data['cfg_styles_markup'] : $field->value = self::$defaults['cfg_styles_markup']);
+    $wrapper->append($field);
+
+    // field for scripts markup
+    $field = new InputfieldText();
+    $field->label = "Scripts";
+    $field->attr('name+id', 'cfg_scripts_markup');
+    if(isset($data['cfg_scripts_markup']) ? $field->value = $data['cfg_scripts_markup'] : $field->value = self::$defaults['cfg_scripts_markup']);
+    $wrapper->append($field);
+
+    $form->append($wrapper);
+    return $form;
+  }
+
+  // Returns config values of module
+  public static function get_config_value($key) {
+    if(isset($this)) {
+     if($this->$key) return $this->key;
+    } else {
+     $modules = wire('modules');
+     $module_config = $modules->getModuleConfigData(__CLASS__);
+     if(array_key_exists($key, $module_config)) return $module_config[$key];
+    }
+    return false;
+  }
+
+
+  public function ___install() {
+  }
+  public function ___uninstall() {
+  }
+}
