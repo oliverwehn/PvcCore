@@ -17,7 +17,7 @@
  */
 namespace PWvc;
 
-class PwvcController extends \WireData {
+class PwvcController extends PwvcObject {
 
   const DEFAULT_ACTION = 'index';
 
@@ -60,6 +60,10 @@ class PwvcController extends \WireData {
   public function setModel(PwvcModel $model) {
     $this->_model = $model;
     return $this;
+  }
+
+  public function calledAction() {
+    return 'index';
   }
 
   /**

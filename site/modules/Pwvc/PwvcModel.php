@@ -26,8 +26,8 @@ class PwvcModel extends PwvcObject {
    *
    */
   public function get($key) {
-    $result = $this->_page->get($key);
-    return $result ? $result : parent::get($key);
+    $result = parent::get($key);
+    return $result ? $result : $this->_page->get($key);
   }
 
   public function set($key, $value) {

@@ -122,114 +122,6 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   /**
-   * Request setup
-   */
-  // init new request
-  private function _request_init(&$page) {
-    $new_request = array(
-      'Controller' => null,
-      'Route' => '/',
-      'Scope' => array()
-    );
-    $request_id = count($this->requests);
-    $this->requests[] = $new_request;
-    $this->requests[$request_id]['page'] = $page;
-    return $request_id;
-  }
-
-  // set up controller
-  private function _init_controller($controller_name, &$errors) {
-    $controller_class = $this->sanitize_controller_name($controller_name, true);
-    $controller_class_ns = self::NS . "\\" . $controller_class;
-    if(!class_exists($controller_class_ns)) {
-      $controller_file = $this->get_controller_filename($controller_class);
-      $controller_path = $this->paths->controllers . $controller_file . self::ext('controllers');
-      // check if controller file exists
-      if(!file_exists($controller_path)) {
-        $errors[] = sprintf($this->_("Controller file '%s' doesn’t exist."), $controller_path);
-        return false;
-      }
-      // include controller class
-      require_once($controller_path);
-    }
-    if(!class_exists($controller_class_ns)) {
-      $errors[] = sprintf($this->_("Controller '%s' can’t be initialized."), $controller_class);
-      return false;
-    }
-    return new $controller_class_ns();
-  }
-
-
-  // check and set action
-  private function _request_set_action($request_id, $action) {
-    if(!$this->_request_id_valid($request_id)) return false;
-    if($this->requests[$request_id]['controller'] == null) {
-      $this->requests[$request_id]['errors'][] = $this->_("Tried to set action before controller was initialized.");
-      return false;
-    }
-    if(!method_exists($this->requests[$request_id]['controller'], $action)) {
-      $this->requests[$request_id]['errors'][] = sprintf($this->_("Action '%s' isn’t defined in controller '%s'."), $action, $this->sanitize_controller_name($this->request['controller_path']));
-      return false;
-    }
-    $this->requests[$request_id]['action'] = $action;
-    return true;
-  }
-
-  // display request errors
-  private function _show_errors($errors) {
-    throw new WireException(sprintf($this->_("There went something wrong: %s"), implode("<br />" . PHP_EOL, $errors)));
-  }
-
-  // build scope
-  private function _request_build_scope($request_id) {
-    if(!$this->_request_id_valid($request_id)) return false;
-    $scope = array();
-    foreach($this->fuel as $var => $val) {
-      $scope[$var] =& $this->$var;
-    }
-    $this->requests[$request_id]['scope']['fuel'] = $scope;
-
-  }
-
-  /**
-   * Process request
-   */
-  public function process(Page $page, $options) {
-    $template = $page->template;
-    $errors = array();
-
-    if($template->altFilename == self::TEMPLATE_FILENAME) {
-      // PWVC is enabled for this template and therefor page is being processed
-      // start setting up request data for rendering
-      if($stack = $this->_init_stack($page->template->name, $errors)) {
-        $render_settings = $controller->execute($options);
-        // start renderer process
-        $renderer =& $this->renderer;
-        $renderer->init($render_settings);
-
-        $out = $renderer->render();
-
-        if(!$out) {
-          // error rendering failed
-        }
-        return $out;
-      }
-      // if errors happened, show them
-      if(count($errors) > 0) {
-        if($this->config->debug) {
-          ob_start();
-          $this->_show_errors($errors);
-          $out = ob_get_contents();
-          ob_end_clean();
-        }
-        else
-          throw new PageNotFoundException();
-      }
-      return $out;
-    }
-  }
-
-  /**
    * Determine route
    */
   public function get_route($action = NULL) {
@@ -351,14 +243,14 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
       'views' => '.view.php',
       'snippets' => '.snippet.php'
     );
-    return $exts[$type];
+    return $exts[$type . 's'];
     return $renderer_class_ns::ext($type);
   }
 
 
 
   // Sanitize controller name
-  public static function sanitize_classname($template_name, $suffix='', $ns=true) {
+  public static function get_classname($template_name, $suffix='', $ns=true) {
     $suffix = is_string($suffix) ? self::camelcase($suffix) : '';
     $class_name = self::camelcase($template_name) . $suffix;
     if($ns) $class_name = self::NS . "\\" . $class_name;
@@ -375,15 +267,26 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     else throw new \WireException(sprintf(_('Wasn’t able to camel case template name. Resulted in "%s".'), $camelcase));
   }
 
-  // Get filename from classname
-  public static function get_class_filename($class_name) {
+  // Sanitize filename
+  public static function sanitize_filename($class_name) {
     if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#^PWvc\\\#", '',$class_name), $matches)) {
       array_pop($matches[1]);
       $filename = strtolower(implode('_', $matches[1]));
-      return $filename;
     } else {
+      $filename = strtolower($class_name);
+    }
+    if(preg_match("#^[a-z0-9_]+$#", $filename)) {
+      return $filename;
+    }
+    else {
       return false;
     }
+  }
+
+  // Get filename from classname
+  public static function get_filename($type, $class_name) {
+    $filename = self::sanitize_filename($class_name);
+    return $filename ? $filename . self::ext($type) : false;
   }
 
   // Sanitize controller name
