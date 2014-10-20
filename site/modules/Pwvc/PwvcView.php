@@ -43,7 +43,6 @@ class PwvcView extends \TemplateFile {
   }
 
   public function ___render() {
-    echo "Rendering " . $this->filename;
     $out = parent::___render();
     return $out;
   }

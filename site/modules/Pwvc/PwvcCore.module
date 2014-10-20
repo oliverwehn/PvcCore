@@ -66,7 +66,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     // set global pwvc var
     Wire::setFuel('pwvc', $this);
 
-    $this->addHookBefore('PageRender::renderPage', $this, 'renderPage');
+    $this->addHookBefore('PageRender::renderPage', $this, 'renderView');
 
     // set up renderer
     if(!$this->cfg_renderer_name) {
@@ -112,13 +112,15 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
    * @param $event Event Object
    * @return null
    */
-  public function renderPage($event) {
-    $page = $event->arguments[0]->object;
-    $stack = new PWvc\PwvcStack($page);
+  public function renderView($event) {
+    $oEvent = $event->arguments(0);
     $module = $event->object;
-    $event->object = $stack;
-    $event->replace = true;
-    $event->return = $module->___renderPage($event);
+    $page = $oEvent->object;
+    $oEvent->replace = true;
+    if($page->template == 'admin') return;
+    $stack = new PWvc\PwvcStack($page);
+    $oEvent->object = $stack;
+    $module->___renderPage($oEvent);
   }
 
   /**
