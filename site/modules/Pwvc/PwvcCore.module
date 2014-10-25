@@ -18,6 +18,7 @@ require_once('PwvcObject.php');
 require_once('PwvcStack.php');
 require_once('PwvcModel.php');
 require_once('PwvcView.php');
+require_once('PwvcLayout.php');
 require_once('PwvcController.php');
 require_once('PwvcRenderer.php');
 
@@ -26,10 +27,12 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   const PERMISSION_NAME = 'pwvc-admin';
   const MODULE_NAME = 'PWvc';
   const TEMPLATE_FILENAME = 'pwvc';
-  const DEFAULT_LAYOUT = 'layout';
+  const DEFAULT_LAYOUT = 'default';
   const DEFAULT_RENDERER = 'Native';
   const APP_CONTROLLER = 'AppController.php';
   const NS = 'PWvc';
+
+  private $_renderer = null;
 
   private static
         $defaults = array(
@@ -71,9 +74,6 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     // set up renderer
     if(!$this->cfg_renderer_name) {
       $this->cfg_renderer_name = self::DEFAULT_RENDERER;
-    }
-    if(!$this->_init_renderer($this->cfg_renderer_name)) {
-      throw new WireException(sprintf($this->_("Failed loading renderer '%s'"), $this->cfg_renderer_name));
     }
 
     // set relative template dir
@@ -152,24 +152,35 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
    * Handling renderer
    */
   // set up renderer
-  private function _init_renderer($renderer_name) {
-    if(!is_string($renderer_name)) return false;
-    $renderer_class = 'PwvcRenderer' . $renderer_name;
-    $renderer_class_ns = 'PWvc\\' . $renderer_class;
-    if(!class_exists($renderer_class_ns)) {
-      $renderer_path = $this->clean_path(dirname(__FILE__));
-      require_once($renderer_path . $renderer_class . '.php');
+  private function initRenderer($rendererName = NULL) {
+    $class = 'PwvcRenderer';
+    if(!is_string($rendererName)) $rendererName = $this->cfg_renderer_name;
+    $instanceOf = self::NS . '\\' . $class;
+    $classNs = $instanceOf . $this->camelcase($rendererName);
+    $class .= $this->camelcase($rendererName);
+    if(!class_exists($classNs)) {
+      $rendererPath = $this->cleanPath(dirname(__FILE__));
+      require_once($rendererPath . $class . '.php');
     }
-    if(!class_exists($renderer_class_ns)) return false;
-
-    $renderer = new $renderer_class_ns();
-    $this->renderer = $renderer;
-    return true;
+    $renderer = new $classNs;
+    if(!($renderer instanceof $instanceOf)) {
+      throw new WireException(sprintf($this->_('Renderer "%s" can’t be initialized.'), $class));
+    }
+    return $renderer;
   }
 
   // returns current template engine
-  public function get_renderer() {
-    return $this->renderer;
+  public function &getRenderer($rendererName = NULL) {
+    if(is_string($rendererName)) {
+      $renderer = &$this->initRenderer($rendererName);
+    }
+    else {
+      if(!$this->_renderer) {
+        $this->_renderer = $this->initRenderer();
+      }
+      $renderer = &$this->_renderer;
+    }
+    return $renderer;
   }
 
 
@@ -181,13 +192,13 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     if(!$rel_path = $this->get('cfg_' . $key . '_path')) {
       $rel_path = self::$defaults[$key . '_path'];
     }
-    $path = $this->clean_path($this->config->paths->root . $rel_path);
+    $path = $this->cleanPath($this->config->paths->root . $rel_path);
     return $this->validate_dir($path, false);
   }
 
   // Check if dir is valid. If it doesn’t exist, create it.
   public static function validate_dir($path, $clean=true) {
-    if($clean) $path = self::clean_path($path);
+    if($clean) $path = self::cleanPath($path);
     if((!is_dir($path)) && (!mkdir($path))) {
       throw new WireException(sprintf(__("Directory '%s' wasn’t found and coundn’t be created."), $path));
     }
@@ -195,7 +206,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   // beautify path string
-  public static function clean_path($path) {
+  public static function cleanPath($path) {
     $path = isset($this)?$this->config->paths->normalizeSeparators($path):wire('config')->paths->normalizeSeparators($path);
     return str_replace("//", "/", rtrim($path, "/") . "/");
   }
@@ -243,6 +254,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
       'controllers' => '.controller.php',
       'layouts' => '.layout.php',
       'views' => '.view.php',
+      'templates' => '.tmpl.php',
       'snippets' => '.snippet.php'
     );
     return $exts[$type . 's'];
@@ -411,14 +423,14 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $field = new InputfieldText();
     $field->label = "Layouts path";
     $field->attr('name+id', 'cfg_layouts_path');
-    if(isset($data['cfg_layouts_path']) ? $field->value = self::clean_path($data['cfg_layouts_path']) : $field->value = self::$defaults['cfg_layouts_path']);
+    if(isset($data['cfg_layouts_path']) ? $field->value = self::cleanPath($data['cfg_layouts_path']) : $field->value = self::$defaults['cfg_layouts_path']);
     $wrapper->append($field);
 
     // field for app controller path
     $field = new InputfieldText();
     $field->label = 'App Controller folder, where is the App Controller located';
     $field->attr('name+id', 'cfg_app_controller_path');
-    if(isset($data['cfg_app_controller_path']) ? $field->value = self::clean_path($data['cfg_app_controller_path']) : $field->value = self::$defaults['cfg_app_controller_path']);
+    if(isset($data['cfg_app_controller_path']) ? $field->value = self::cleanPath($data['cfg_app_controller_path']) : $field->value = self::$defaults['cfg_app_controller_path']);
     $wrapper->append($field);
     $form->append($wrapper);
 
@@ -426,21 +438,21 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $field = new InputfieldText();
     $field->label = "Controllers path";
     $field->attr('name+id', 'cfg_controllers_path');
-    if(isset($data['cfg_controllers_path']) ? $field->value = self::clean_path($data['cfg_controllers_path']) : $field->value = self::$defaults['cfg_controllers_path']);
+    if(isset($data['cfg_controllers_path']) ? $field->value = self::cleanPath($data['cfg_controllers_path']) : $field->value = self::$defaults['cfg_controllers_path']);
     $wrapper->append($field);
 
     // field for snippets path
     $field = new InputfieldText();
     $field->label = "Snippets path";
     $field->attr('name+id', 'cfg_snippets_path');
-    if(isset($data['cfg_snippets_path']) ? $field->value = self::clean_path($data['cfg_snippets_path']) : $field->value = self::$defaults['cfg_snippets_path']);
+    if(isset($data['cfg_snippets_path']) ? $field->value = self::cleanPath($data['cfg_snippets_path']) : $field->value = self::$defaults['cfg_snippets_path']);
     $wrapper->append($field);
 
     // field for views path
     $field = new InputfieldText();
     $field->label = "Views path";
     $field->attr('name+id', 'cfg_views_path');
-    if(isset($data['cfg_views_path']) ? $field->value = self::clean_path($data['cfg_views_path']) : $field->value = self::$defaults['cfg_views_path']);
+    if(isset($data['cfg_views_path']) ? $field->value = self::cleanPath($data['cfg_views_path']) : $field->value = self::$defaults['cfg_views_path']);
     $wrapper->append($field);
     $form->append($wrapper);
 
@@ -448,7 +460,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $field = new InputfieldText();
     $field->label = "Assets path";
     $field->attr('name+id', 'cfg_assets_path');
-    if(isset($data['cfg_assets_path']) ? $field->value = self::clean_path($data['cfg_assets_path']) : $field->value = self::$defaults['cfg_assets_path']);
+    if(isset($data['cfg_assets_path']) ? $field->value = self::cleanPath($data['cfg_assets_path']) : $field->value = self::$defaults['cfg_assets_path']);
     $wrapper->append($field);
 
     $form->append($wrapper);

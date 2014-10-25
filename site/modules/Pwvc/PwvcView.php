@@ -26,12 +26,12 @@ class PwvcView extends \TemplateFile {
     $this->set('_controller', $controller);
     $fuel = self::getAllFuel();
     $this->set('wire', $fuel);
-    foreach($fuel as $key => $value) $this->set($key, $value);
-    $this->output->set('page', $this->page);
+    foreach($fuel as $key => $value) $this->superSet($key, $value);
+    $page = $this->page;
 
   }
 
-  public function loadViewFile() {
+  public function ___loadViewFile() {
     $filename = $this->getViewFilename();
     if(file_exists($filename)) {
       parent::__construct($filename);
@@ -42,8 +42,69 @@ class PwvcView extends \TemplateFile {
     }
   }
 
-  public function ___render() {
-    $out = parent::___render();
+  public function ___buildScope($layer = NULL, $stack = NULL) {
+    $scope = array();
+    if($layer === NULL) {
+      $layer = $this;
+      $stack = array('view', 'controller', 'model', 'page');
+      array_shift($stack);
+      $scope = array_merge($this->buildScope($this, $stack), $scope);
+    }
+    else {
+      if($layer instanceof PwvcView) {
+         $properties = $layer->wire->getArray();
+      }
+      else {
+        $properties = $layer->getArray();
+      }
+      foreach($properties as $k=>$v) {
+        if(array_key_exists($k, $scope)) {
+          $scope[$k] = null;
+        }
+        $scope[$k] = $this->$k;
+        unset($v);
+      }
+      if(count($stack) >= 1) {
+        $nextLayer = '_' . array_shift($stack);
+        $scope = array_merge($this->buildScope($layer->$nextLayer, $stack), $scope);
+      }
+    }
+
+    return $scope;
+  }
+
+  public function ___importScope(Array $scope) {
+    return $this->set('scope', $scope);
+  }
+
+
+  public function ___render($super=false) {
+    if($super) return parent::___render();
+
+    $renderer = $this->pwvc->getRenderer();
+    $controller = &$this->_controller;
+    $controller->action();
+    $scope = $this->buildScope();
+    $this->savedDir = getcwd();
+
+    chdir(dirname($this->filename));
+
+    $out = "\n" . $renderer->render($this, $scope) . "\n";
+
+    if(count($this->options['pageStack']) == 0) {
+      $layoutName = $this->_controller->get('layout');
+      if($layoutName != NULL) {
+        $layout = $this->_initLayout($layoutName);
+        if($layout->loadLayoutFile()) {
+          $scope['outlet'] = $out;
+          $layout->importScope($scope);
+          $out = $layout->render();
+        }
+      }
+    }
+
+    if($this->savedDir) chdir($this->savedDir);
+
     return $out;
   }
 
@@ -55,7 +116,7 @@ class PwvcView extends \TemplateFile {
         $result = $this->$method();
       }
     }
-    return $result ? $result : parent::get($key);
+    return $result ? $result : $this->superGet($key);
   }
 
   public function set($key, $value) {
@@ -69,7 +130,18 @@ class PwvcView extends \TemplateFile {
         return $this->$method($value);
       }
     }
+    return $this->superSet($key, $value);
+  }
+
+  public function superGet($key) {
+    return parent::get($key);
+  }
+  public function superSet($key, $value) {
     return parent::set($key, $value);
+  }
+
+  public function setGlobal($key, $value, $override = false) {
+    return parent::setGlobal($key, $value, $override);
   }
 
   public function getController() {
@@ -81,7 +153,7 @@ class PwvcView extends \TemplateFile {
     return $this;
   }
 
-  public function getViewFilename($template_name=null, $action = null) {
+  public function ___getViewFilename($template_name=null, $action = null) {
     $path = $this->pwvc->paths->views;
     $dir = \PwvcCore::sanitize_filename($template_name ? $template_name : get_class($this));
     $path .= $dir . '/';
@@ -89,8 +161,30 @@ class PwvcView extends \TemplateFile {
       $controller = $this->get('controller');
       $action = $controller->calledAction();
     }
-    $path .= $this->pwvc->get_filename('view', $action);
+    $path .= $this->pwvc->get_filename('template', $action);
     return $path;
+  }
+
+  protected function _initLayout($layoutName) {
+    $class = \PwvcCore::get_classname($layoutName, 'layout');
+    if($class && !class_exists($class)) {
+      $class_file = \PwvcCore::get_filename('layout', $class);
+      $class_path = $this->pwvc->paths->layouts . $class_file;
+      // check if class file exists
+      if(file_exists($class_path)) {
+        // yes: include it
+        require_once($class_path);
+      }
+      // check again
+      if(!class_exists($class)) {
+        // fall back to creating class on demand
+        $base_class = \PwvcCore::get_classname('Pwvc', 'layout');
+        $base_class::extend($class, '$controller');
+      }
+    }
+    // initiate class
+    $instance = new $class($this->_controller);
+    return $instance;
   }
 
 

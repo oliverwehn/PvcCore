@@ -1,12 +1,12 @@
-<?php
+ <?php
 /**
  * PWvc Twig Renderer Class V. 0.5.0
  * Part of PWvc, a module for ProcessWire 2.3+
- * 
+ *
  * by Oliver Wehn
  * https://github.com/oliverwehn
  *
- * inspired of and based on parts of MVC Module by Harmster 
+ * inspired of and based on parts of MVC Module by Harmster
  * https://github.com/Hawiak
  * hawiak.nl
  *
@@ -21,7 +21,7 @@ class PwvcRendererTwig extends PwvcRenderer {
   // Name of renderer, used to address it from PWvc module
   const RENDERER_NAME = 'Twig';
 
-  protected static 
+  protected static
   $extensions = array(
     'controllers' => '.php',
     'layouts' => '.tmpl',
@@ -40,7 +40,7 @@ class PwvcRendererTwig extends PwvcRenderer {
 
     // modify behaviour of Page::__isset
     //http://processwire.com/talk/topic/1421-twig/#entry13080
-    Page::$issetHas = true; 
+    Page::$issetHas = true;
 
     // get Twig cache
     $this->cache_path = $this->config->paths->root . '/' . $this->cache_path;
@@ -48,22 +48,22 @@ class PwvcRendererTwig extends PwvcRenderer {
       throw new WireException(sprintf($this->__("Twig cache folder '%s' wasn’t found and cound’t be created."), $this->cache_path));
     }
   }
-  
 
-  protected function _process() {
+
+  public function ___render() {
     // template code goes here
     $templates = array();
 
     $layout_file_name = basename($this->layout_file);
     $view_file_name = basename($this->view_file);
 
-    
+
     // get layout template code
     if(!$this->page->get('embedded')) {
       if(file_exists($this->layout_file)) {
         $layout_content = file_get_contents($this->layout_file);
         $templates[basename($this->layout_file)] = $layout_content;
-      } else { 
+      } else {
         throw new WireException(sprintf($this->__("Wasn’t able to load layout file '%s'"), $this->layout_file));
       }
     } else {
@@ -97,9 +97,9 @@ class PwvcRendererTwig extends PwvcRenderer {
     $loaders['filesystem']->addPath($this->pwvc->paths->layouts, 'layouts');
     $loaders['filesystem']->addPath($this->pwvc->paths->views, 'views');
     $loaders['filesystem']->addPath($this->pwvc->paths->snippets, 'snippets');
-    
+
     $loader_chain = new Twig_Loader_Chain($loaders);
-    
+
     $this->environments[] = new Twig_Environment($loader_chain, array('debug' => $this->config->debug, 'cache' => $this->cache_path, 'autoescape' => false));
     $twig = &$this->environments[count($this->environments) - 1];
     $twig->addGlobal('renderer', $this);

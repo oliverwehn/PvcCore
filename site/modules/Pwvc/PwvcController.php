@@ -37,7 +37,7 @@ class PwvcController extends PwvcObject {
   }
 
   public function init() {
-    $this->set_layout(\PwvcCore::DEFAULT_LAYOUT);
+    $this->set('layout', \PwvcCore::DEFAULT_LAYOUT);
   }
 
   public function get($key) {
@@ -60,6 +60,14 @@ class PwvcController extends PwvcObject {
   public function setModel(PwvcModel $model) {
     $this->_model = $model;
     return $this;
+  }
+
+  public function action($action=NULL) {
+    if(!$action) $action = $this->calledAction();
+    if(!method_exists($this, $action)) throw new \WireException(sprintf($this->_('Called invalid action "%s" on controller "%s".'), $action, get_class($this)));
+    $refl_meth = new \ReflectionMethod($this, $action);
+    if(!$refl_meth->isPublic()) throw new \WireException(sprintf($this->_('No public action method "%s" found on controller "%s".'), $action, get_class($this)));
+    return $this->$action();
   }
 
   public function calledAction() {
@@ -251,13 +259,6 @@ class PwvcController extends PwvcObject {
       unset($v);
     }
     return $scope;
-  }
-
-  public function set_layout($layout) {
-    return $this->layout = $layout;
-  }
-  public function get_layout() {
-    return $this->layout;
   }
 
   public function add_style($style_path, $priority=0, $group_name=NULL) {

@@ -31,7 +31,7 @@ class PwvcStack extends PwvcObject {
       if($class && !class_exists($class)) {
         $class_file = \PwvcCore::get_filename($layer, $class);
         $layer_plural = $layer . 's';
-        $class_path = $this->pwvc->paths->$layer_plural . $class_file . \PwvcCore::ext($layer);
+        $class_path = $this->pwvc->paths->$layer_plural . $class_file;
         // check if class file exists
         if(file_exists($class_path)) {
           // yes: include it

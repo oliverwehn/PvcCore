@@ -23,43 +23,48 @@ abstract class PwvcRenderer extends \WireData {
 
   protected static
   $extensions = array(
-    'controllers' => '.php',
-    'layouts' => '.php',
+    'models' => '.model.php',
+    'controllers' => '.controller.php',
     'views' => '.view.php',
+    'layouts' => '.layout.php',
+    'templates' => '.tmpl.php',
     'snippets' => '.snippet.php'
     );
 
   public function __construct() {
+
+    $this->init();
   }
 
-  public function init($settings) {
-    // check settings
-    $required = array('layout', 'view', 'scope');
-    foreach($required as $r) {
-      if(!array_key_exists($r, $settings)) throw new \WireException(sprintf($this->_("Required setting '%s' isn’t set."), $r));
-    }
-    // setup new render process entry
-    $process = array(
-      'layout' => $settings['layout'] !== NULL ? $this->_get_file('layout', $settings['layout']) : NULL,
-      'view' => $this->_get_file('view', $settings['view']),
-      'scope' => $settings['scope']
-    );
-    $this->processes[] = $process;
-    $this->current =& $this->processes[count($this->processes) - 1];
-    return $this->current;
+  // public function init($settings) {
+  public function init() {
+    // // check settings
+    // $required = array('layout', 'view', 'scope');
+    // foreach($required as $r) {
+    //   if(!array_key_exists($r, $settings)) throw new \WireException(sprintf($this->_("Required setting '%s' isn’t set."), $r));
+    // }
+    // // setup new render process entry
+    // $process = array(
+    //   'layout' => $settings['layout'] !== NULL ? $this->_get_file('layout', $settings['layout']) : NULL,
+    //   'view' => $this->_get_file('view', $settings['view']),
+    //   'scope' => $settings['scope']
+    // );
+    // $this->processes[] = $process;
+    // $this->current =& $this->processes[count($this->processes) - 1];
+    // return $this->current;
   }
 
-  public function render($process_id=null) {
-    if(count($this->processes) == 0) throw new \WireException($this->_("No render processes set up for rendering."));
-    if($process_id !== null) {
-      if(!isset($this->processes[$process_id])) throw new \WireException(sprintf($this->_("Rendering process with id '%d' doesn’t exist."), $process_id));
-      $process =& $this->processes[$process_id];
-    } else {
-      $process =& $this->current;
-    }
-    $out = $this->_process($process);
-    return $out;
-  }
+  // public function render($process_id=null) {
+  //   if(count($this->processes) == 0) throw new \WireException($this->_("No render processes set up for rendering."));
+  //   if($process_id !== null) {
+  //     if(!isset($this->processes[$process_id])) throw new \WireException(sprintf($this->_("Rendering process with id '%d' doesn’t exist."), $process_id));
+  //     $process =& $this->processes[$process_id];
+  //   } else {
+  //     $process =& $this->current;
+  //   }
+  //   $out = $this->_process($process);
+  //   return $out;
+  // }
 
   private function _get_file($type, $name) {
     if($path = $this->pwvc->paths->get($type . 's')) {
@@ -70,7 +75,7 @@ abstract class PwvcRenderer extends \WireData {
     }
   }
 
-  abstract protected function _process($process);
+  abstract public function ___render(PwvcView $view, Array $scope);
 
   public static function ext($of) {
     $extensions = static::$extensions;
@@ -128,15 +133,15 @@ abstract class PwvcRenderer extends \WireData {
     return $page->render();
   }
 
-  public function __call($name, $arguments) {
-    if(method_exists($this, '_get_' . $name)) {
-      $method = '_get_' . $name;
-      return $this->$method($arguments[0]);
-    }
-    if($name == 'styles' || $name == 'scripts') {
-      return call_user_func(array($this, '_get_markup'), $name, count($arguments)?$arguments[0]:null);
-    }
-  }
+  // public function __call($name, $arguments) {
+  //   if(method_exists($this, '_get_' . $name)) {
+  //     $method = '_get_' . $name;
+  //     return $this->$method($arguments[0]);
+  //   }
+  //   if($name == 'styles' || $name == 'scripts') {
+  //     return call_user_func(array($this, '_get_markup'), $name, count($arguments)?$arguments[0]:null);
+  //   }
+  // }
 
   private function _get_config_value($key) {
     if(!$this->module_config) {
