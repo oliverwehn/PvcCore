@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Native Renderer Class V. 0.5.0
- * Part of PWvc, a module for ProcessWire 2.3+
+ * Pwvc Native Renderer Class V. 0.5.0
+ * Part of Pwvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -10,9 +10,9 @@
  * PHP and PW API calls.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
-class PWvcRendererNative extends PWvcRenderer {
+class PwvcRendererNative extends PwvcRenderer {
 
   const RENDERER_NAME = 'Native';
 
@@ -23,7 +23,7 @@ class PWvcRendererNative extends PWvcRenderer {
   }
 
 
-  public function ___render(PWvcView $view, Array $scope) {
+  public function ___render(PwvcView $view, Array $scope) {
 
     extract($scope);
 

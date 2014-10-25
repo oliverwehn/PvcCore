@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Module Class V. 0.9.1
- * Part of PWvc, a module for ProcessWire 2.3+
+ * Pwvc Module Class V. 0.9.1
+ * Part of Pwvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -15,20 +15,20 @@
  * methods. Don’t modifiy.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
 require_once('Controller.php');
-require_once('PWvcRenderer.php');
+require_once('PwvcRenderer.php');
 
-class ProcessPWvc extends \Process implements \Module, \ConfigurableModule {
+class ProcessPwvc extends \Process implements \Module, \ConfigurableModule {
 
 	const PAGE_NAME = 'pwvc-module';
 	const PERMISSION_NAME = 'pwvc-module';
-	const MODULE_NAME = 'PWvc';
+	const MODULE_NAME = 'Pwvc';
 	const TEMPLATE_FILENAME = 'pwvc';
 	const DEFAULT_LAYOUT_NAME = 'layout';
 	const DEFAULT_RENDERER = 'Native';
-  const NS = 'PWvc';
+  const NS = 'Pwvc';
 
 	private $app_controller = 'AppController.php';
 	private $templates_rel_path = '';
@@ -74,12 +74,12 @@ class ProcessPWvc extends \Process implements \Module, \ConfigurableModule {
 
 	public static function getModuleInfo(){
 		return array(
-			'title' => 'PWvc',
+			'title' => 'Pwvc',
 			'summary' => __('Stands for ProcessWire-Module-View. A module that implements MVC’ish template processing.'),
 			'autoload' => true,
 			'version' => 050,
 			'author' => 'Oliver Wehn, Harmster',
-			'href' => 'https://github.com/oliverwehn/PWvc'
+			'href' => 'https://github.com/oliverwehn/Pwvc'
 		);
 	}
 
@@ -131,7 +131,7 @@ class ProcessPWvc extends \Process implements \Module, \ConfigurableModule {
     if($this->page->process == 'ProcessModule') {
     	$this->hooks['save_module'] = wire('modules')->addHookBefore('saveModuleConfigData', $this, 'processModuleConfigPaths');
     }
-    // keep ProcessTemplate from finding PWvc’s php files in template dir
+    // keep ProcessTemplate from finding Pwvc’s php files in template dir
     if($this->page->process == 'ProcessTemplate') {
     	$this->hooks['hide_controller'] = $this->addHookBefore('ProcessTemplate::executeAdd', $this, 'hideAppController');
     	$this->hooks['unhide_controller'] = $this->addHookAfter('ProcessTemplate::executeAdd', $this, 'unhideAppController');
@@ -171,7 +171,7 @@ class ProcessPWvc extends \Process implements \Module, \ConfigurableModule {
 		$field->attr('name+id', 'renderer_name');
 		$d = dir(dirname(__FILE__));
 		while($f = $d->read()) {
-			if(preg_match("#^PWvcRenderer(([A-Z][a-z]+)+)\.php$#", $f, $match)) {
+			if(preg_match("#^PwvcRenderer(([A-Z][a-z]+)+)\.php$#", $f, $match)) {
 				$name = $match[1];
 				$field->addOption($name, null, $data['renderer_name'] == $name?array('selected'=>'selected'):null);
 			}
@@ -892,7 +892,7 @@ class ProcessPWvc extends \Process implements \Module, \ConfigurableModule {
 	// Get file extension
 	public static function ext($type, $renderer=null) {
 		$renderer_class = wire('pwvc')->renderer;
-		if(!$renderer_class) $renderer_class = 'PWvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
+		if(!$renderer_class) $renderer_class = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
 		return $renderer_class::ext($type);
 	}
 
@@ -1015,7 +1015,7 @@ class ProcessPWvc extends \Process implements \Module, \ConfigurableModule {
 	// set up renderer
 	private function _init_renderer($renderer_name) {
 		if(!is_string($renderer_name)) return false;
-		$renderer_class = 'PWvcRenderer' . $renderer_name;
+		$renderer_class = 'PwvcRenderer' . $renderer_name;
 		if(!class_exists($renderer_class)) {
 			$renderer_path = $this->clean_path(dirname(__FILE__));
 			require($renderer_path . $renderer_class . '.php');

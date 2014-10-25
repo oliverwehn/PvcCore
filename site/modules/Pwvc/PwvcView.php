@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc View Class V. 0.9.0
- * Part of PWvc, a module for ProcessWire 2.5+
+ * Pwvc View Class V. 0.9.0
+ * Part of Pwvc, a module for ProcessWire 2.5+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -10,19 +10,19 @@
  * Don’t modifiy.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
-class PWvcView extends \TemplateFile {
+class PwvcView extends \TemplateFile {
 
   protected $_controller;
 
   /**
    * Construct the view from template name
    *
-   * @param PWvcController $controller template-specific controller object
+   * @param PwvcController $controller template-specific controller object
    *
    */
-  public function __construct(PWvcController $controller) {
+  public function __construct(PwvcController $controller) {
     $this->set('_controller', $controller);
     $fuel = self::getAllFuel();
     $this->set('wire', $fuel);
@@ -51,7 +51,7 @@ class PWvcView extends \TemplateFile {
       $scope = array_merge($this->buildScope($this, $stack), $scope);
     }
     else {
-      if($layer instanceof PWvcView) {
+      if($layer instanceof PwvcView) {
          $properties = $layer->wire->getArray();
       }
       else {
@@ -111,7 +111,7 @@ class PWvcView extends \TemplateFile {
   public function get($key) {
     $result = $this->_controller->get($key);
     if($result === NULL) {
-      $method = 'get' . \PWvcCore::camelcase($key);
+      $method = 'get' . \PwvcCore::camelcase($key);
       if(method_exists($this, $method)) {
         $result = $this->$method();
       }
@@ -125,7 +125,7 @@ class PWvcView extends \TemplateFile {
       return $controller->set($key, $value);
     }
     else {
-      $method = 'set' . \PWvcCore::camelcase($key);
+      $method = 'set' . \PwvcCore::camelcase($key);
       if(method_exists($this, $method)) {
         return $this->$method($value);
       }
@@ -148,14 +148,14 @@ class PWvcView extends \TemplateFile {
     return $this->_controller;
   }
 
-  public function setController(PWvcController $controller) {
+  public function setController(PwvcController $controller) {
     $this->_controller = $controller;
     return $this;
   }
 
   public function ___getViewFilename($templateName=null, $action = null) {
     $path = $this->pwvc->paths->views;
-    $dir = \PWvcCore::sanitizeFilename($templateName ? $templateName : get_class($this));
+    $dir = \PwvcCore::sanitizeFilename($templateName ? $templateName : get_class($this));
     $path .= $dir . '/';
     if(!$action) {
       $controller = $this->get('controller');
@@ -166,9 +166,9 @@ class PWvcView extends \TemplateFile {
   }
 
   protected function _initLayout($layoutName) {
-    $class = \PWvcCore::getClassname($layoutName, 'layout');
+    $class = \PwvcCore::getClassname($layoutName, 'layout');
     if($class && !class_exists($class)) {
-      $classFile = \PWvcCore::getFilename('layout', $class);
+      $classFile = \PwvcCore::getFilename('layout', $class);
       $classPath = $this->pwvc->paths->layouts . $classFile;
       // check if class file exists
       if(file_exists($classPath)) {
@@ -178,7 +178,7 @@ class PWvcView extends \TemplateFile {
       // check again
       if(!class_exists($class)) {
         // fall back to creating class on demand
-        $base_class = \PWvcCore::getClassname('PWvc', 'layout');
+        $base_class = \PwvcCore::getClassname('Pwvc', 'layout');
         $base_class::extend($class, '$controller');
       }
     }
@@ -197,7 +197,7 @@ class PWvcView extends \TemplateFile {
       }
     }
     $classCode = "
-    namespace PWvc;
+    namespace Pwvc;
     class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $className) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
       public function __constructor(" . implode(', ', $initWith) .") {
         parent::__constructor(" . implode(', ', $initWith) .");

@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Stack Class V. 0.1.0
- * Part of PWvc, a module for ProcessWire 2.4+
+ * Pwvc Stack Class V. 0.1.0
+ * Part of Pwvc, a module for ProcessWire 2.4+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -11,7 +11,7 @@
  * methods. Don’t modifiy.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
 class PwvcStack extends PwvcObject {
 
@@ -85,6 +85,31 @@ class PwvcStack extends PwvcObject {
   public function __call($method, $arguments) {
     $model = $this->get('model');
     return call_user_func(array(&$model, $method), $arguments);
+  }
+
+  public function getRoute() {
+    $route = '/';
+    if($action) {
+      // $rou
+    }
+    if($this->validateAction($action)) {
+      if($action !== self::DEFAULT_ACTION) {
+        if(strpos($action, '_'))
+          $action = implode('/', explode('_', $action));
+        $route .= $action . '/';
+      }
+    } else {
+      // get route from urlSegements
+      $i = 0;
+      $routeSegments = array();
+      while(isset($this->input->urlSegments[$i+1])) {
+        $i++;
+        $routeSegments[] = $this->input->urlSegments[$i];
+      }
+      if($i > 0)
+        $route .= implode('/', $routeSegments) . '/';
+    }
+    return $route;
   }
 
   public function setModel(PwvcModel $model) {

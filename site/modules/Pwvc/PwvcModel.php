@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Model Class V. 0.1.0
- * Part of PWvc, a module for ProcessWire 2.4+
+ * Pwvc Model Class V. 0.1.0
+ * Part of Pwvc, a module for ProcessWire 2.4+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -11,7 +11,7 @@
  * methods. Don’t modifiy.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
 class PwvcModel extends PwvcObject {
 

@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Abstract Renderer Class V. 0.5.1
- * Part of PWvc, a module for ProcessWire 2.3+
+ * Pwvc Abstract Renderer Class V. 0.5.1
+ * Part of Pwvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -10,11 +10,11 @@
  * that provides basic functionality.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
-abstract class PWvcRenderer extends \WireData {
+abstract class PwvcRenderer extends \WireData {
 
-  // Name of renderer, used to address it from PWvc module
+  // Name of renderer, used to address it from Pwvc module
   const RENDERER_NAME = '';
 
   protected $processes = array(),
@@ -102,16 +102,20 @@ abstract class PWvcRenderer extends \WireData {
     return $page->render();
   }
 
+  protected function _scripts($group) {
+
+  }
+
   private function _get_file($type, $name) {
     if($path = $this->pwvc->paths->get($type . 's')) {
       $path .= $name . $this->ext($type . 's');
       return $path;
     } else {
-      throw new \WireException(sprintf($this->_("Couldn’t get path for '%s' from PWvc Core."), $type));
+      throw new \WireException(sprintf($this->_("Couldn’t get path for '%s' from Pwvc Core."), $type));
     }
   }
 
-  abstract public function ___render(PWvcView $view, Array $scope);
+  abstract public function ___render(PwvcView $view, Array $scope);
 
   public static function ext($of) {
     $extensions = static::$extensions;
@@ -182,7 +186,7 @@ abstract class PWvcRenderer extends \WireData {
   private function _get_config_value($key) {
     if(!$this->module_config) {
       if(!$this->modules) $this->modules = wire('modules');
-      $this->module_config = $this->modules->getModuleConfigData('PWvcCore');
+      $this->module_config = $this->modules->getModuleConfigData('PwvcCore');
     }
     if(array_key_exists($key, $this->module_config)) return $this->module_config[$key];
     else return FALSE;

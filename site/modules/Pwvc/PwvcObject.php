@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Object Class V. 0.1.0
- * Part of PWvc, a module for ProcessWire 2.4+
+ * Pwvc Object Class V. 0.1.0
+ * Part of Pwvc, a module for ProcessWire 2.4+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -11,7 +11,7 @@
  * methods. Don’t modifiy.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
 abstract class PwvcObject extends \WireData {
 
@@ -81,7 +81,7 @@ abstract class PwvcObject extends \WireData {
       }
     }
     $classCode = "
-    namespace PWvc;
+    namespace Pwvc;
     class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $className) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
       public function __constructor(" . implode(', ', $initWith) .") {
         parent::__constructor(" . implode(', ', $initWith) .");

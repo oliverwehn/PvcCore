@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Controller Class V. 0.9.0
- * Part of PWvc, a module for ProcessWire 2.3+
+ * Pwvc Controller Class V. 0.9.0
+ * Part of Pwvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -15,7 +15,7 @@
  * methods. Don’t modifiy.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
 class Controller extends \Wire {
 	protected $layout;
@@ -230,6 +230,6 @@ public function set_route_pattern($path, array $match, $method) {
 
 
 	protected function _ext($type, $subtype=null) {
-		return ProcessPWvc::ext($type, $this->pwvc->template_engine);
+		return ProcessPwvc::ext($type, $this->pwvc->template_engine);
 	}
 }

@@ -1,18 +1,18 @@
 <?php
 /**
- * PWvc Layout Class V. 0.9.0
- * Part of PWvc, a module for ProcessWire 2.5+
+ * Pwvc Layout Class V. 0.9.0
+ * Part of Pwvc, a module for ProcessWire 2.5+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
  *
- * View class extends PWvcView class.
+ * View class extends PwvcView class.
  * Don’t modifiy.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
-class PWvcLayout extends PWvcView {
+class PwvcLayout extends PwvcView {
 
   public function ___loadLayoutFile() {
     $filename = $this->getLayoutFilename();

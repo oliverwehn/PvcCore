@@ -1,7 +1,7 @@
  <?php
 /**
- * PWvc Twig Renderer Class V. 0.5.0
- * Part of PWvc, a module for ProcessWire 2.3+
+ * Pwvc Twig Renderer Class V. 0.5.0
+ * Part of Pwvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -16,9 +16,9 @@
 
 require_once('Twig/Autoloader.php');
 
-class PWvcRendererTwig extends PWvcRenderer {
+class PwvcRendererTwig extends PwvcRenderer {
 
-  // Name of renderer, used to address it from PWvc module
+  // Name of renderer, used to address it from Pwvc module
   const RENDERER_NAME = 'Twig';
 
   protected static
@@ -44,7 +44,7 @@ class PWvcRendererTwig extends PWvcRenderer {
 
     // get Twig cache
     $this->cache_path = $this->config->paths->root . '/' . $this->cache_path;
-    if(!ProcessPWvc::validate_dir($this->cache_path)) {
+    if(!ProcessPwvc::validate_dir($this->cache_path)) {
       throw new WireException(sprintf($this->__("Twig cache folder '%s' wasn’t found and cound’t be created."), $this->cache_path));
     }
   }

@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Core Module Class V. 0.1.0
- * Part of PWvc, a module for ProcessWire 2.3+
+ * Pwvc Core Module Class V. 0.1.0
+ * Part of Pwvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -25,12 +25,12 @@ require_once('PwvcRenderer.php');
 class PwvcCore extends WireData implements Module, ConfigurableModule {
 
   const PERMISSION_NAME = 'pwvc-admin';
-  const MODULE_NAME = 'PWvc';
+  const MODULE_NAME = 'Pwvc';
   const TEMPLATE_FILENAME = 'pwvc';
   const DEFAULT_LAYOUT = 'default';
   const DEFAULT_RENDERER = 'Native';
   const APP_CONTROLLER = 'AppController.php';
-  const NS = 'PWvc';
+  const NS = 'Pwvc';
 
   private $_renderer = null;
 
@@ -50,12 +50,12 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
 
   public static function getModuleInfo(){
     return array(
-      'title' => 'PWvc Core',
+      'title' => 'Pwvc Core',
       'summary' => __('Stands for ProcessWire-Module-View. A module that implements MVC’ish template processing.'),
       'autoload' => true,
       'version' => 100,
       'author' => 'Oliver Wehn',
-      'href' => 'https://github.com/oliverwehn/PWvc',
+      'href' => 'https://github.com/oliverwehn/Pwvc',
       'singular' => true,
       //'installs' => 'ProcessPwvc'
     );
@@ -118,7 +118,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $page = $oEvent->object;
     $oEvent->replace = true;
     if($page->template == 'admin') return;
-    $stack = new PWvc\PwvcStack($page);
+    $stack = new Pwvc\PwvcStack($page);
     $oEvent->object = $stack;
     $module->___renderPage($oEvent);
   }
@@ -248,7 +248,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   public static function ext($type, $renderer=null) {
     $rendererClass = wire('pwvc')->renderer;
     if(!$rendererClass) $rendererClass = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
-    $rendererClassNs = 'PWvc\\' . $rendererClass;
+    $rendererClassNs = 'Pwvc\\' . $rendererClass;
     $exts = array(
       'models' => '.model.php',
       'controllers' => '.controller.php',
@@ -283,7 +283,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
 
   // Sanitize filename
   public static function sanitizeFilename($className) {
-    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#^PWvc\\\#", '',$className), $matches)) {
+    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#^Pwvc\\\#", '',$className), $matches)) {
       array_pop($matches[1]);
       $filename = strtolower(implode('_', $matches[1]));
     } else {
@@ -320,7 +320,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
 
   // Get filename from controller name
   public static function getControllerFilename($controllerName) {
-    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#Controller$#", '', preg_replace("#^PWvc\\\#", '',$controllerName)), $matches)) {
+    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#Controller$#", '', preg_replace("#^Pwvc\\\#", '',$controllerName)), $matches)) {
       $filename = strtolower(implode('_', $matches[1]));
       return $filename;
     } else {

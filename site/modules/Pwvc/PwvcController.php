@@ -1,7 +1,7 @@
 <?php
 /**
- * PWvc Controller Class V. 0.9.0
- * Part of PWvc, a module for ProcessWire 2.3+
+ * Pwvc Controller Class V. 0.9.0
+ * Part of Pwvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -15,9 +15,9 @@
  * methods. Don’t modifiy.
  *
  */
-namespace PWvc;
+namespace Pwvc;
 
-class PWvcController extends PWvcObject {
+class PwvcController extends PwvcObject {
 
   const DEFAULT_ACTION = 'index';
 
@@ -31,13 +31,13 @@ class PWvcController extends PWvcObject {
   /**
    * Initialization and setup
    */
-  public function __construct(PWvcModel $model) {
+  public function __construct(PwvcModel $model) {
     $this->set('_model', $model);
     $this->init();
   }
 
   public function init() {
-    $this->set('layout', \PWvcCore::DEFAULT_LAYOUT);
+    $this->set('layout', \PwvcCore::DEFAULT_LAYOUT);
   }
 
   public function get($key) {
@@ -57,7 +57,7 @@ class PWvcController extends PWvcObject {
     return $this->_model;
   }
 
-  public function setModel(PWvcModel $model) {
+  public function setModel(PwvcModel $model) {
     $this->_model = $model;
     return $this;
   }
@@ -285,6 +285,6 @@ class PWvcController extends PWvcObject {
 
 
   protected function _ext($type, $subtype=NULL) {
-    return ProcessPWvc::ext($type, $this->pwvc->template_engine);
+    return ProcessPwvc::ext($type, $this->pwvc->template_engine);
   }
 }
