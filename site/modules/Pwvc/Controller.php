@@ -2,15 +2,15 @@
 /**
  * PWvc Controller Class V. 0.9.0
  * Part of PWvc, a module for ProcessWire 2.3+
- * 
+ *
  * by Oliver Wehn
  * https://github.com/oliverwehn
  *
- * inspired of and based on parts of MVC Module by Harmster 
+ * inspired of and based on parts of MVC Module by Harmster
  * https://github.com/Hawiak
  * hawiak.nl
  *
- * Basic Controller class that extends PW’s Wire class and 
+ * Basic Controller class that extends PW’s Wire class and
  * so provides access to fuel vars besides basic module-specific
  * methods. Don’t modifiy.
  *
@@ -21,7 +21,7 @@ class Controller extends \Wire {
 	protected $layout;
 	protected $view;
 	protected $scripts = array();
-	protected $styles = array(); 
+	protected $styles = array();
 	protected $scope = array();
 	protected $routes = array();
 
@@ -130,7 +130,7 @@ public function set_route_pattern($path, array $match, $method) {
 		if(!$only) {
 			$scope = array_merge($this->scope['fuel'], $this->scope['root']);
 		} else {
-			$scope = array(); 
+			$scope = array();
 		}
 		// add context scope
 		if($only || ($context != 'fuel' && $context != 'root'))
@@ -230,6 +230,6 @@ public function set_route_pattern($path, array $match, $method) {
 
 
 	protected function _ext($type, $subtype=null) {
-		return ProcessPwvc::ext($type, $this->pwvc->template_engine);
+		return ProcessPWvc::ext($type, $this->pwvc->template_engine);
 	}
 }

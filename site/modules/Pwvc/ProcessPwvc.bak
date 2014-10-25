@@ -18,9 +18,9 @@
 namespace PWvc;
 
 require_once('Controller.php');
-require_once('PwvcRenderer.php');
+require_once('PWvcRenderer.php');
 
-class ProcessPwvc extends \Process implements \Module, \ConfigurableModule {
+class ProcessPWvc extends \Process implements \Module, \ConfigurableModule {
 
 	const PAGE_NAME = 'pwvc-module';
 	const PERMISSION_NAME = 'pwvc-module';
@@ -171,7 +171,7 @@ class ProcessPwvc extends \Process implements \Module, \ConfigurableModule {
 		$field->attr('name+id', 'renderer_name');
 		$d = dir(dirname(__FILE__));
 		while($f = $d->read()) {
-			if(preg_match("#^PwvcRenderer(([A-Z][a-z]+)+)\.php$#", $f, $match)) {
+			if(preg_match("#^PWvcRenderer(([A-Z][a-z]+)+)\.php$#", $f, $match)) {
 				$name = $match[1];
 				$field->addOption($name, null, $data['renderer_name'] == $name?array('selected'=>'selected'):null);
 			}
@@ -892,7 +892,7 @@ class ProcessPwvc extends \Process implements \Module, \ConfigurableModule {
 	// Get file extension
 	public static function ext($type, $renderer=null) {
 		$renderer_class = wire('pwvc')->renderer;
-		if(!$renderer_class) $renderer_class = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
+		if(!$renderer_class) $renderer_class = 'PWvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
 		return $renderer_class::ext($type);
 	}
 
@@ -1015,7 +1015,7 @@ class ProcessPwvc extends \Process implements \Module, \ConfigurableModule {
 	// set up renderer
 	private function _init_renderer($renderer_name) {
 		if(!is_string($renderer_name)) return false;
-		$renderer_class = 'PwvcRenderer' . $renderer_name;
+		$renderer_class = 'PWvcRenderer' . $renderer_name;
 		if(!class_exists($renderer_class)) {
 			$renderer_path = $this->clean_path(dirname(__FILE__));
 			require($renderer_path . $renderer_class . '.php');

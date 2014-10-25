@@ -17,38 +17,38 @@ class PwvcStack extends PwvcObject {
 
   function __construct(\Page $page) {
     parent::__construct();
-    $this->_init_stack($page);
+    $this->_initStack($page);
   }
 
   // set up stack
-  private function _init_stack(\Page $page, &$errors=array()) {
-    $template_name = $page->template->name;
+  private function _initStack(\Page $page, &$errors=array()) {
+    $templateName = $page->template->name;
     $stack = array('model', 'controller', 'view');
-    $init_with = $page;
+    $initWith = $page;
     foreach($stack as $layer) {
-      $class = \PwvcCore::get_classname($template_name, $layer);
+      $class = \PwvcCore::getClassName($templateName, $layer);
       $this->superSet($layer . 'Class', $class);
       if($class && !class_exists($class)) {
-        $class_file = \PwvcCore::get_filename($layer, $class);
-        $layer_plural = $layer . 's';
-        $class_path = $this->pwvc->paths->$layer_plural . $class_file;
+        $classFile = \PwvcCore::getFilename($layer, $class);
+        $layerPlural = $layer . 's';
+        $classPath = $this->pwvc->paths->$layerPlural . $classFile;
         // check if class file exists
-        if(file_exists($class_path)) {
+        if(file_exists($classPath)) {
           // yes: include it
-          require_once($class_path);
+          require_once($classPath);
         }
         // check again
         if(!class_exists($class)) {
           // fall back to creating class on demand
-          $base_class = \PwvcCore::get_classname('Pwvc', $layer);
-          $base_class::extend($class, '$init_with');
+          $baseClass = \PwvcCore::getClassName('Pwvc', $layer);
+          $baseClass::extend($class, '$initWith');
         }
       }
       // initiate class
-      $instance = new $class($init_with);
+      $instance = new $class($initWith);
       // add to stack
       $this->set($layer, $layer !== 'view' ? $instance : NULL);
-      $init_with = $this->get($layer);
+      $initWith = $this->get($layer);
     }
   }
 

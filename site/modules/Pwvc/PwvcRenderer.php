@@ -12,7 +12,7 @@
  */
 namespace PWvc;
 
-abstract class PwvcRenderer extends \WireData {
+abstract class PWvcRenderer extends \WireData {
 
   // Name of renderer, used to address it from PWvc module
   const RENDERER_NAME = '';
@@ -66,6 +66,42 @@ abstract class PwvcRenderer extends \WireData {
   //   return $out;
   // }
 
+
+  protected function _embed($page) {
+
+    if(is_numeric($page)) {
+      $page = $this->pages->get($page);
+    } elseif(is_string($page)) {
+      if(strpos($page, '/')) {
+        $it = $page;
+        $page = $this->pages->get("path=$it");
+        if(!$page->id) {
+          $urlSegments = array();
+          $maxSegments = $this->config->maxUrlSegments;
+          if(is_null($maxSegments)) $maxSegments = 4; // default
+          $cnt = 0;
+
+          // if the page isn't found, then check if a page one path level before exists
+          // this loop allows for us to have both a urlSegment and a pageNum
+          while((!$page || !$page->id) && $cnt < $maxSegments) {
+            $it = rtrim($it, '/');
+            $pos = strrpos($it, '/')+1;
+            $urlSegment = substr($it, $pos);
+            $urlSegments[$cnt] = $urlSegment;
+            $it = substr($it, 0, $pos); // $it no longer includes the urlSegment
+            $page = $this->pages->get("path=$it, status<" . Page::statusMax);
+            $cnt++;
+          }
+
+          $page = $this->pages->get($page);
+        }
+      }
+      else $page = $this->pages->get('name=' . $page);
+    }
+    if(!$page instanceof \Page) return false;
+    return $page->render();
+  }
+
   private function _get_file($type, $name) {
     if($path = $this->pwvc->paths->get($type . 's')) {
       $path .= $name . $this->ext($type . 's');
@@ -75,7 +111,7 @@ abstract class PwvcRenderer extends \WireData {
     }
   }
 
-  abstract public function ___render(PwvcView $view, Array $scope);
+  abstract public function ___render(PWvcView $view, Array $scope);
 
   public static function ext($of) {
     $extensions = static::$extensions;
@@ -146,7 +182,7 @@ abstract class PwvcRenderer extends \WireData {
   private function _get_config_value($key) {
     if(!$this->module_config) {
       if(!$this->modules) $this->modules = wire('modules');
-      $this->module_config = $this->modules->getModuleConfigData('PwvcCore');
+      $this->module_config = $this->modules->getModuleConfigData('PWvcCore');
     }
     if(array_key_exists($key, $this->module_config)) return $this->module_config[$key];
     else return FALSE;

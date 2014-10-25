@@ -12,17 +12,17 @@
  */
 namespace PWvc;
 
-class PwvcView extends \TemplateFile {
+class PWvcView extends \TemplateFile {
 
   protected $_controller;
 
   /**
    * Construct the view from template name
    *
-   * @param string $template_name Page’s template name
+   * @param PWvcController $controller template-specific controller object
    *
    */
-  public function __construct(PwvcController $controller) {
+  public function __construct(PWvcController $controller) {
     $this->set('_controller', $controller);
     $fuel = self::getAllFuel();
     $this->set('wire', $fuel);
@@ -51,7 +51,7 @@ class PwvcView extends \TemplateFile {
       $scope = array_merge($this->buildScope($this, $stack), $scope);
     }
     else {
-      if($layer instanceof PwvcView) {
+      if($layer instanceof PWvcView) {
          $properties = $layer->wire->getArray();
       }
       else {
@@ -111,7 +111,7 @@ class PwvcView extends \TemplateFile {
   public function get($key) {
     $result = $this->_controller->get($key);
     if($result === NULL) {
-      $method = 'get' . \PwvcCore::camelcase($key);
+      $method = 'get' . \PWvcCore::camelcase($key);
       if(method_exists($this, $method)) {
         $result = $this->$method();
       }
@@ -125,7 +125,7 @@ class PwvcView extends \TemplateFile {
       return $controller->set($key, $value);
     }
     else {
-      $method = 'set' . \PwvcCore::camelcase($key);
+      $method = 'set' . \PWvcCore::camelcase($key);
       if(method_exists($this, $method)) {
         return $this->$method($value);
       }
@@ -148,37 +148,37 @@ class PwvcView extends \TemplateFile {
     return $this->_controller;
   }
 
-  public function setController(PwvcController $controller) {
+  public function setController(PWvcController $controller) {
     $this->_controller = $controller;
     return $this;
   }
 
-  public function ___getViewFilename($template_name=null, $action = null) {
+  public function ___getViewFilename($templateName=null, $action = null) {
     $path = $this->pwvc->paths->views;
-    $dir = \PwvcCore::sanitize_filename($template_name ? $template_name : get_class($this));
+    $dir = \PWvcCore::sanitizeFilename($templateName ? $templateName : get_class($this));
     $path .= $dir . '/';
     if(!$action) {
       $controller = $this->get('controller');
       $action = $controller->calledAction();
     }
-    $path .= $this->pwvc->get_filename('template', $action);
+    $path .= $this->pwvc->getFilename('template', $action);
     return $path;
   }
 
   protected function _initLayout($layoutName) {
-    $class = \PwvcCore::get_classname($layoutName, 'layout');
+    $class = \PWvcCore::getClassname($layoutName, 'layout');
     if($class && !class_exists($class)) {
-      $class_file = \PwvcCore::get_filename('layout', $class);
-      $class_path = $this->pwvc->paths->layouts . $class_file;
+      $classFile = \PWvcCore::getFilename('layout', $class);
+      $classPath = $this->pwvc->paths->layouts . $classFile;
       // check if class file exists
-      if(file_exists($class_path)) {
+      if(file_exists($classPath)) {
         // yes: include it
-        require_once($class_path);
+        require_once($classPath);
       }
       // check again
       if(!class_exists($class)) {
         // fall back to creating class on demand
-        $base_class = \PwvcCore::get_classname('Pwvc', 'layout');
+        $base_class = \PWvcCore::getClassname('PWvc', 'layout');
         $base_class::extend($class, '$controller');
       }
     }
@@ -188,22 +188,22 @@ class PwvcView extends \TemplateFile {
   }
 
 
-  public static function extend($class_name) {
+  public static function extend($className) {
     $args = func_get_args();
-    $init_with = array();
+    $initWith = array();
     foreach($args as $i=>$v) {
       if($i > 0) {
-        $init_with[] = $v;
+        $initWith[] = $v;
       }
     }
-    $class_code = "
+    $classCode = "
     namespace PWvc;
-    class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $class_name) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
-      public function __constructor(" . implode(', ', $init_with) .") {
-        parent::__constructor(" . implode(', ', $init_with) .");
+    class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $className) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
+      public function __constructor(" . implode(', ', $initWith) .") {
+        parent::__constructor(" . implode(', ', $initWith) .");
       }
     }
     ";
-    eval($class_code);
+    eval($classCode);
   }
 }

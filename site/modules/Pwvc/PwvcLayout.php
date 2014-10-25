@@ -6,13 +6,13 @@
  * by Oliver Wehn
  * https://github.com/oliverwehn
  *
- * View class extends PwvcView class.
+ * View class extends PWvcView class.
  * Don’t modifiy.
  *
  */
 namespace PWvc;
 
-class PwvcLayout extends PwvcView {
+class PWvcLayout extends PWvcView {
 
   public function ___loadLayoutFile() {
     $filename = $this->getLayoutFilename();
@@ -30,7 +30,7 @@ class PwvcLayout extends PwvcView {
   public function ___getLayoutFilename($layout_name=NULL) {
     $path = $this->pwvc->paths->layouts;
     if(!$layout_name) $layout_name = $this->_controller->get('layout');
-    $path .= $this->pwvc->get_filename('template', $layout_name);
+    $path .= $this->pwvc->getFilename('template', $layout_name);
     return $path;
   }
   public function ___getViewFilename($template_name=null, $action = null) { return $this->getLayoutFilename($template_name=null); }

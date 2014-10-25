@@ -16,7 +16,7 @@
 
 require_once('Twig/Autoloader.php');
 
-class PwvcRendererTwig extends PwvcRenderer {
+class PWvcRendererTwig extends PWvcRenderer {
 
   // Name of renderer, used to address it from PWvc module
   const RENDERER_NAME = 'Twig';
@@ -44,7 +44,7 @@ class PwvcRendererTwig extends PwvcRenderer {
 
     // get Twig cache
     $this->cache_path = $this->config->paths->root . '/' . $this->cache_path;
-    if(!ProcessPwvc::validate_dir($this->cache_path)) {
+    if(!ProcessPWvc::validate_dir($this->cache_path)) {
       throw new WireException(sprintf($this->__("Twig cache folder '%s' wasn’t found and cound’t be created."), $this->cache_path));
     }
   }

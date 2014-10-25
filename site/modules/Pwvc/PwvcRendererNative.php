@@ -12,7 +12,7 @@
  */
 namespace PWvc;
 
-class PwvcRendererNative extends PwvcRenderer {
+class PWvcRendererNative extends PWvcRenderer {
 
   const RENDERER_NAME = 'Native';
 
@@ -23,7 +23,7 @@ class PwvcRendererNative extends PwvcRenderer {
   }
 
 
-  public function ___render(PwvcView $view, Array $scope) {
+  public function ___render(PWvcView $view, Array $scope) {
 
     extract($scope);
 
@@ -73,14 +73,7 @@ class PwvcRendererNative extends PwvcRenderer {
           return $out;
         },
         'embed' => function($page) use ($scope) {
-          if(is_numeric($page)) {
-            $page = $this->pages->get($page);
-          } elseif(is_string($page)) {
-            if(strpos($page, '/')) $page = $this->pages->get($page);
-            else $page = $this->pages->get('name=' . $page);
-          }
-          if(!$page instanceof \Page) return false;
-          return $page->render();
+          return $this->_embed($page);
         },
         'scripts' => function($group) use ($scope) {
           return "";

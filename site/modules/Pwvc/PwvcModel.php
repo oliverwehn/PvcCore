@@ -48,8 +48,8 @@ class PwvcModel extends PwvcObject {
 
   public function __call($method, $arguments) {
     try {
-      $refl_meth = new \ReflectionMethod($this->_page, $method);
-      return $refl_meth->isPublic() ? call_user_func(array(&$this->_page, $method), $arguments) : FALSE;
+      $reflMeth = new \ReflectionMethod($this->_page, $method);
+      return $reflMeth->isPublic() ? call_user_func(array(&$this->_page, $method), $arguments) : FALSE;
     } catch(\Exception $e) {
       throw new \WireException(sprintf($this->_('An error occured: %s'), $e));
     }

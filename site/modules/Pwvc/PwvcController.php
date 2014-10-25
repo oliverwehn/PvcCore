@@ -17,7 +17,7 @@
  */
 namespace PWvc;
 
-class PwvcController extends PwvcObject {
+class PWvcController extends PWvcObject {
 
   const DEFAULT_ACTION = 'index';
 
@@ -31,13 +31,13 @@ class PwvcController extends PwvcObject {
   /**
    * Initialization and setup
    */
-  public function __construct(PwvcModel $model) {
+  public function __construct(PWvcModel $model) {
     $this->set('_model', $model);
     $this->init();
   }
 
   public function init() {
-    $this->set('layout', \PwvcCore::DEFAULT_LAYOUT);
+    $this->set('layout', \PWvcCore::DEFAULT_LAYOUT);
   }
 
   public function get($key) {
@@ -57,7 +57,7 @@ class PwvcController extends PwvcObject {
     return $this->_model;
   }
 
-  public function setModel(PwvcModel $model) {
+  public function setModel(PWvcModel $model) {
     $this->_model = $model;
     return $this;
   }
@@ -65,70 +65,20 @@ class PwvcController extends PwvcObject {
   public function action($action=NULL) {
     if(!$action) $action = $this->calledAction();
     if(!method_exists($this, $action)) throw new \WireException(sprintf($this->_('Called invalid action "%s" on controller "%s".'), $action, get_class($this)));
-    $refl_meth = new \ReflectionMethod($this, $action);
-    if(!$refl_meth->isPublic()) throw new \WireException(sprintf($this->_('No public action method "%s" found on controller "%s".'), $action, get_class($this)));
+    $reflMeth = new \ReflectionMethod($this, $action);
+    if(!$reflMeth->isPublic()) throw new \WireException(sprintf($this->_('No public action method "%s" found on controller "%s".'), $action, get_class($this)));
     return $this->$action();
   }
 
-  public function calledAction() {
-    return 'index';
-  }
-
-  /**
-   * Execution
-   */
-  public function execute($options) {
-    // get route
-    $force_action = NULL;
-    if(array_key_exists('action', $options))
-      $force_action = $options['action'];
-    else
-      $force_action = self::DEFAULT_ACTION;
-    $route = $this->get_route($force_action);
-    // get action
-    $action = $this->get_action($route);
-    // execute action
-    $this->$action($options);
-    // package stuff for renderer
-    $result = array(
-      'layout' => $this->layout,
-      'view' => $this->pwvc->get_controller_filename(get_class($this)) . '/' . $action,
-      'scope' => $this->build_scope($options)
-    );
-    return $result;
-  }
-
-  public function get_route($action = NULL) {
-    $route = '/';
-    if($this->validate_action($action)) {
-      if($action !== self::DEFAULT_ACTION) {
-        if(strpos($action, '_'))
-          $action = implode('/', explode('_', $action));
-        $route .= $action . '/';
-      }
-    } else {
-      // get route from urlSegements
-      $i = 0;
-      $route_segments = array();
-      while(isset($this->input->urlSegments[$i+1])) {
-        $i++;
-        $route_segments[] = $this->input->urlSegments[$i];
-      }
-      if($i > 0)
-        $route .= implode('/', $route_segments) . '/';
-    }
-    return $route;
-  }
-
-  public function validate_action($action) {
+  public function validateAction($action) {
     if(!is_string($action)) return FALSE;
     try {
-      $refl_meth = new \ReflectionMethod($this, $action);
+      $reflMeth = new \ReflectionMethod($this, $action);
     } catch(\Exception $e) {
       //printf($this->_("Class '%s' has no action '%s'."), get_class($this), $action);
       return FALSE;
     }
-    if($refl_meth->isPublic()) {
+    if($reflMeth->isPublic()) {
       return TRUE;
     } else {
       return FALSE;
@@ -136,27 +86,27 @@ class PwvcController extends PwvcObject {
   }
 
 
-  public function set_route_pattern($path, array $match, $method) {
-    // alias could be '/{id}/edit/'
+  public function route($path, array $match, $method) {
+    // alias could be '/:id/edit/'
     // should match '/17/edit/'
     // route to action 'action-edit' with input id=>17 available
-    if(!preg_match("#^/(([a-z0-9\-_\{\}]+(/|$))+)$#i", $path, $path_match))
+    if(!preg_match("#^/(([a-z0-9\-_:]+(/|$))+)$#i", $path, $pathMatch))
       throw new \WireException(sprintf($this->_("Path '%s' is not valid for route alias."), $path));
     if(!method_exists($this, $method))
       throw new \WireException(sprintf($this->_("Tried to set up a route to method '%s' which doesn’t exist."), $method));
-    $path_elements = explode("/", rtrim($path_match[1], '/'));
+    $pathElements = explode("/", rtrim($pathMatch[1], '/'));
     $route = '#^' . preg_quote(rtrim($path, '/')) . '(/(page[0-9]+/?)?)?$#';
     $keys = array();
     $i = 0;
     do {
       $i++;
-      $start = mb_strpos($route, '{');
+      $start = mb_strpos($route, ':');
       if($start !== FALSE) {
         if($start == mb_strlen($route) - 1) break;
-        $end = mb_strpos($route, '}', $start);
-        $key = mb_substr($route, $start + 1, $end - ($start + 2));
+        $end = mb_strpos($route, '/', $start);
+        $key = mb_substr($route, $start + 1, $end - ($start + 1));
         $keys[$i] = $key;
-        $route = str_replace(preg_quote('{'.$key.'}'), "(".$match[$key].")", $route);
+        $route = str_replace(preg_quote(':'.$key), "(".$match[$key].")", $route);
       }
     } while($start !== FALSE);
     $pattern = array(
@@ -167,12 +117,13 @@ class PwvcController extends PwvcObject {
     return $route;
   }
 
-  public function get_action($route) {
+  public function calledAction() {
+    return "index";
     $route_segments = explode('/', rtrim(ltrim($route, '/'), '/'));
     if(count($route_segments) > 1) {
       // maybe a regular action?
       $action = implode('_', $route_segments);
-      if($this->validate_action($action)) return $action;
+      if($this->validateAction($action)) return $action;
       // or more special? Check for patterns
       if(count($this->routes) > 0) {
         foreach($this->routes as $pattern => $route_def) {
@@ -334,6 +285,6 @@ class PwvcController extends PwvcObject {
 
 
   protected function _ext($type, $subtype=NULL) {
-    return ProcessPwvc::ext($type, $this->pwvc->template_engine);
+    return ProcessPWvc::ext($type, $this->pwvc->template_engine);
   }
 }

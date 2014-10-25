@@ -15,14 +15,8 @@ namespace PWvc;
 
 abstract class PwvcObject extends \WireData {
 
-  protected $properties = array();
-
   public function __construct() {
 
-  }
-
-  private function _properties() {
-    return [];
   }
 
   public function get($key) {
@@ -78,23 +72,23 @@ abstract class PwvcObject extends \WireData {
     return $this->set($key, $value);
   }
 
-  public static function extend($class_name) {
+  public static function extend($className) {
     $args = func_get_args();
-    $init_with = array();
+    $initWith = array();
     foreach($args as $i=>$v) {
       if($i > 0) {
-        $init_with[] = $v;
+        $initWith[] = $v;
       }
     }
-    $class_code = "
+    $classCode = "
     namespace PWvc;
-    class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $class_name) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
-      public function __constructor(" . implode(', ', $init_with) .") {
-        parent::__constructor(" . implode(', ', $init_with) .");
+    class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $className) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
+      public function __constructor(" . implode(', ', $initWith) .") {
+        parent::__constructor(" . implode(', ', $initWith) .");
       }
     }
     ";
-    eval($class_code);
+    eval($classCode);
   }
 
 }
