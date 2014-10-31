@@ -23,9 +23,6 @@ class PwvcController extends PwvcObject {
 
   protected $_model;
 
-  protected $layout = NULL;
-  protected $scripts = array();
-  protected $styles = array();
   protected $routes = array();
 
   /**
@@ -33,6 +30,7 @@ class PwvcController extends PwvcObject {
    */
   public function __construct(PwvcModel $model) {
     $this->set('_model', $model);
+    $this->set('assets', new \WireArray);
     $this->init();
   }
 
@@ -145,6 +143,41 @@ class PwvcController extends PwvcObject {
       }
     }
     return self::DEFAULT_ACTION;
+  }
+
+  /* Add a script to be available to the view
+   * @method script
+   */
+  public function script($name, $group="base", $prio=0) {
+    return $this->_setAsset('scripts', $group, $prio, $name);
+  }
+  /* Add a stylesheet to be available to the view
+   * @method script
+   */
+  public function style($name, $group="base", $prio=0) {
+    return $this->_setAsset('styles', $group, $prio, $name);
+  }
+  /* Internal asset setter method
+   * @method script
+   */
+  private function _setAsset($type, $group, $prio, $name) {
+    $assets = $this->get('assets');
+    if(!$assets->has($type)) $assets->set($type, new \WireArray);
+    $assetsForType = $assets->get($type);
+    if(!$assetsForType->has($group)) $assetsForType->set($group, new \WireArray);
+    $assetsGroup = $assetsForType->get($group);
+    $newAsset = new \WireData;
+    $newAssetPath = preg_match("#^(http:)?//#i", $name) ? $name : $this->pwvc->urls->$type . $name;
+    $newAsset->set('path', $newAssetPath)->set('priority', $prio);
+    $assetsGroup->set($name, $newAsset);
+    return $assetsGroup->count;
+  }
+  private function _getAsset($type, $group, $name) {
+    $assets = $this->get('assets');
+    if(!(array_key_exists($type, $assets)) || !(array_key_exists($group, $assets[$type])) || !(array_key_exists($name, $assets[$type][$group])))
+      return false;
+    else
+      return $assets[$type][$group][$name];
   }
 
   // default action

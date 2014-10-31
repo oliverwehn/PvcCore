@@ -23,13 +23,7 @@ abstract class PwvcRenderer extends \WireData {
 
   protected static
   $extensions = array(
-    'models' => '.model.php',
-    'controllers' => '.controller.php',
-    'views' => '.view.php',
-    'layouts' => '.layout.php',
-    'templates' => '.tmpl.php',
-    'snippets' => '.snippet.php'
-    );
+  );
 
   public function __construct() {
 
@@ -190,5 +184,33 @@ abstract class PwvcRenderer extends \WireData {
     }
     if(array_key_exists($key, $this->module_config)) return $this->module_config[$key];
     else return FALSE;
+  }
+
+  protected function _extractAssets(\WireArray $assets, $type, $group=NULL) {
+    $assetsArray = [];
+    $assetsOfType = $assets->get($type);
+    if($group === NULL) {
+      foreach($assetsOfType as $group => $assetItems) {
+        $assetsArray = array_merge($assetsArray, $this->_extractAssets($assets, $type, $group));
+      }
+    }
+    else {
+      if($assetsOfType->has($group)) {
+        $assetsGroup = $assetsOfType->get($group);
+        $all = $assetsGroup->getArray();
+        usort($all, array($this, '_sortByPriority'));
+        foreach($all as $asset) {
+          $assetsArray[] = $asset->get('path');
+        }
+      }
+    }
+    return $assetsArray;
+  }
+
+  private function _sortByPriority($a, $b) {
+    $ap = $a->get('priority');
+    $bp = $b->get('priority');
+    if($ap == $bp) return 0;
+    return $ap < $bp?-1:1;
   }
 }

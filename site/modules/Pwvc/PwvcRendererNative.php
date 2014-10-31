@@ -59,7 +59,7 @@ class PwvcRendererNative extends PwvcRenderer {
     return trim($out);
   }
 
-  public function setTemplateFuncs($scope) {
+  public function ___setTemplateFuncs($scope) {
     $this->set('templateFuncs',
       array(
         'snippet' => function($name) use ($scope) {
@@ -76,10 +76,24 @@ class PwvcRendererNative extends PwvcRenderer {
           return $this->_embed($page);
         },
         'scripts' => function($group) use ($scope) {
-          return "";
+          if(!array_key_exists('assets', $scope)) return false;
+          if(!($markup = $this->pwvc->getConfigValue('cfgScriptsMarkup'))) return false;
+          $scripts = $this->_extractAssets($scope['assets'], 'scripts', $group);
+          $scriptsMarkup = "";
+          foreach($scripts as $path) {
+            $scriptsMarkup .= sprintf($markup, $path);
+          }
+          return  $scriptsMarkup;
         },
         'styles' => function($group) use ($scope) {
-          return "";
+          if(!array_key_exists('assets', $scope)) return false;
+          if(!($markup = $this->pwvc->getConfigValue('cfgStylesMarkup'))) return false;
+          $styles = $this->_extractAssets($scope['assets'], 'styles', $group);
+          $stylesMarkup = "";
+          foreach($styles as $path) {
+            $stylesMarkup .= sprintf($markup, $path);
+          }
+          return  $stylesMarkup;
         }
       )
     );

@@ -494,7 +494,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     } else {
      $modules = wire('modules');
      $moduleConfig = $modules->getModuleConfigData(__CLASS__);
-     if(array_key_exists($key, $moduleConfig)) return $moduleConfig[$key];
+     return array_key_exists($key, $moduleConfig) ? $moduleConfig[$key] : self::$defaults[lcfirst(preg_replace("#^cfg#", "", $key))];
     }
     return false;
   }
