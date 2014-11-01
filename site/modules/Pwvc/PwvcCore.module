@@ -117,6 +117,16 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $module = $event->object;
     $page = $oEvent->object;
     $oEvent->replace = true;
+    if($this->input->urlSegments) {
+      $options = $oEvent->arguments(1);
+      if(!is_array($options)) $options = array();
+      $urlSegments = array();
+      for($i=0, $cnt=$this->input->urlSegments->count; $i<$cnt; $i++) {
+        $urlSegments[] = $this->input->urlSegments($i);
+      }
+      $options['route'] = implode('/', $urlSegments);
+      $oEvent->arguments[1] = $options;
+    }
     if($page->template == 'admin') return;
     $stack = new Pwvc\PwvcStack($page);
     $oEvent->object = $stack;

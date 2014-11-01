@@ -61,8 +61,8 @@ abstract class PwvcRenderer extends \WireData {
   // }
 
 
-  protected function _embed($page) {
-
+  protected function _embed($page, $options = array()) {
+    if(is_string($options)) $options = array('action' => $options);
     if(is_numeric($page)) {
       $page = $this->pages->get($page);
     } elseif(is_string($page)) {
@@ -86,6 +86,7 @@ abstract class PwvcRenderer extends \WireData {
             $page = $this->pages->get("path=$it, status<" . Page::statusMax);
             $cnt++;
           }
+          $options['route'] = implode('/', $urlSegments);
 
           $page = $this->pages->get($page);
         }
@@ -93,7 +94,7 @@ abstract class PwvcRenderer extends \WireData {
       else $page = $this->pages->get('name=' . $page);
     }
     if(!$page instanceof \Page) return false;
-    return $page->render();
+    return $page->render($options);
   }
 
   protected function _scripts($group) {

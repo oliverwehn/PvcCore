@@ -159,7 +159,8 @@ class PwvcView extends \TemplateFile {
     $path .= $dir . '/';
     if(!$action) {
       $controller = $this->get('controller');
-      $action = $controller->calledAction();
+      $call = $controller->calledAction();
+      $action = $call['action'];
     }
     $path .= $this->pwvc->getFilename('template', $action);
     return $path;

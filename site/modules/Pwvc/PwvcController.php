@@ -60,22 +60,18 @@ class PwvcController extends PwvcObject {
     return $this;
   }
 
-  public function action($action=NULL) {
-    if(!$action) $action = $this->calledAction();
-    if(!method_exists($this, $action)) throw new \WireException(sprintf($this->_('Called invalid action "%s" on controller "%s".'), $action, get_class($this)));
-    $reflMeth = new \ReflectionMethod($this, $action);
-    if(!$reflMeth->isPublic()) throw new \WireException(sprintf($this->_('No public action method "%s" found on controller "%s".'), $action, get_class($this)));
-    return $this->$action();
+  public function action($call=NULL) {
+    if(!$call) $call = $this->calledAction();
+    if(!is_array($call)) $call = array('action' => $call, 'input' => array());
+    if(!$this->validateAction($call['action'])) throw new \WireException(sprintf($this->_('Called invalid action "%s" on controller "%s".'), $call['action'], get_class($this)));
+    if(count($call['input']))
+      $this->input->route = new \WireInputData($call['input']);
+    return $this->$call['action']();
   }
 
   public function validateAction($action) {
     if(!is_string($action)) return FALSE;
-    try {
-      $reflMeth = new \ReflectionMethod($this, $action);
-    } catch(\Exception $e) {
-      //printf($this->_("Class '%s' has no action '%s'."), get_class($this), $action);
-      return FALSE;
-    }
+    $reflMeth = new \ReflectionMethod($this, $action);
     if($reflMeth->isPublic()) {
       return TRUE;
     } else {
@@ -116,33 +112,52 @@ class PwvcController extends PwvcObject {
   }
 
   public function calledAction() {
-    return "index";
+    if(!($options = $this->get('options'))) $options = array();
+    $result = array('action' => self::DEFAULT_ACTION, 'input' => array());
+    if(array_key_exists('action', $options)) {
+      $result['action'] = $options['action'];
+    }
+    elseif(array_key_exists('route', $options)) {
+      $route = $options['route'];
+      if($resolved = $this->routeToAction($route)) {
+        $result['action'] = $resolved['action'];
+        $result['input'] = $resolved['input'];
+      }
+      else {
+        throw new \WireException(sprintf($this->_('Route "%s" isn’t valid for Page "%s".'), $route, $this->get('page')->path));
+      }
+    }
+    return $result;
+  }
+
+  public function routeToAction($route="/") {
+    $result = array('action' => self::DEFAULT_ACTION, 'input' => array());
     $route_segments = explode('/', rtrim(ltrim($route, '/'), '/'));
     if(count($route_segments) > 1) {
       // maybe a regular action?
       $action = implode('_', $route_segments);
-      if($this->validateAction($action)) return $action;
+      if($this->validateAction($action)) $result['action'] = $action;
       // or more special? Check for patterns
       if(count($this->routes) > 0) {
         foreach($this->routes as $pattern => $route_def) {
           if(preg_match($pattern, $route, $matches)) {
             $action = $route_def['action'];
-            $arguments = array();
+            $input = array();
             $cnt_matches = count($matches);
             for($j=1; $j<$cnt_matches; $j++) {
               if(isset($route_def['keys'][$j])) {
-                $arguments[$route_def['keys'][$j]] = $matches[$j];
+                $input[$route_def['keys'][$j]] = $matches[$j];
               } else {
                 break;
               }
             }
-            $this->input->route = new \WireInputData($arguments);
-            return $action;
+            $result['action'] = $action;
+            $result['input'] = $input;
           }
         }
       }
     }
-    return self::DEFAULT_ACTION;
+    return $result;
   }
 
   /* Add a script to be available to the view

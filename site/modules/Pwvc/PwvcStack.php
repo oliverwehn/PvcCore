@@ -21,7 +21,7 @@ class PwvcStack extends PwvcObject {
   }
 
   // set up stack
-  private function _initStack(\Page $page, &$errors=array()) {
+  private function _initStack(\Page $page) {
     $templateName = $page->template->name;
     $stack = array('model', 'controller', 'view');
     $initWith = $page;
@@ -53,31 +53,51 @@ class PwvcStack extends PwvcObject {
   }
 
   public function get($key) {
-    if(property_exists(__CLASS__, $key)) {
-      return $this->$key;
-    }
-    $method = 'get' . \PwvcCore::camelcase($key);
-    if(method_exists($this, $method)) {
-      return $this->$method();
-    }
-    else {
-      $result = $this->superGet($key);
-      if($result) {
-        return $result;
+    switch ($key) {
+      case 'options': {
+        $controller = $this->get('controller');
+        $result = $controller->get($key);
+        break;
       }
-      $model = $this->get('model');
-      return $model->get($key);
+      default: {
+        if(property_exists(__CLASS__, $key)) {
+          $result = $this->$key;
+        }
+        else {
+          $method = 'get' . \PwvcCore::camelcase($key);
+          if(method_exists($this, $method)) {
+            $result = $this->$method();
+          }
+          else {
+            $result = $this->superGet($key);
+            if(!$result) {
+              $model = $this->get('model');
+              $result = $model->get($key);
+            }
+          }
+        }
+      }
     }
+    return $result;
   }
 
   public function set($key, $value) {
-    $method = 'set' . \PwvcCore::camelcase($key);
-    if(method_exists($this, $method)) {
-      $this->$method($value);
-    }
-    else {
-      $model = $this->get('model');
-      $model->set($key, $value);
+    switch ($key) {
+      case 'options': {
+        $controller = $this->get('controller');
+        $controller->set($key, $value);
+        break;
+      }
+      default: {
+        $method = 'set' . \PwvcCore::camelcase($key);
+        if(method_exists($this, $method)) {
+          $this->$method($value);
+        }
+        else {
+          $model = $this->get('model');
+          $model->set($key, $value);
+        }
+      }
     }
     return $this;
   }
