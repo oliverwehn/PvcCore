@@ -39,16 +39,32 @@ class PwvcController extends PwvcObject {
   }
 
   public function get($key) {
-    $result = $this->_model->get($key);
+    switch($key) {
+      case 'options': {
+        $result = $this->getOptions();
+        break;
+      }
+      default: {
+        $result = $this->_model->get($key);
+      }
+    }
     return $result ? $result : parent::get($key);
   }
 
   public function set($key, $value) {
-    $model = &$this->_model;
-    if($model && $model->get($key) !== NULL) {
-      return $model->set($key, $value);
+    switch($key) {
+      case 'options': {
+        $result = $this->setOptions($value);
+        break;
+      }
+      default: {
+        $model = &$this->_model;
+        if($model && $model->get($key) !== NULL) {
+          return $model->set($key, $value);
+        }
+        return parent::set($key, $value);
+      }
     }
-    return parent::set($key, $value);
   }
 
   public function getModel() {
@@ -59,6 +75,52 @@ class PwvcController extends PwvcObject {
     $this->_model = $model;
     return $this;
   }
+
+  public function getOptions() {
+    return $this->superGet('options');
+  }
+
+  public function setOptions(Array $options) {
+    $currOptions = $this->get('options');
+    if(!$currOptions) {
+      // $model = $this->get('model');
+      // if(!($currOptions = $model->get('options')) || (!is_array($currOptions))) $currOptions = array();
+      $currOptions = array();
+    }
+    if(array_key_exists('pageStack', $options) && count($options['pageStack']) == 0) {
+      if(!array_key_exists('route', $options)) {
+        $urlSegments = array();
+        if($this->input->urlSegments) {
+          for($i=0, $cnt=$this->input->urlSegments->count; $i<$cnt; $i++) {
+            $urlSegments[] = $this->input->urlSegments($i);
+          }
+        }
+        $options['route'] = '/' . (count($urlSegments) > 0 ? implode('/', $urlSegments) . '/' : '');
+      }
+    }
+    $options = array_merge($currOptions, $options);
+    $this->superSet('options', $options);
+    return $this;
+  }
+
+//   public function generateCallTrace()
+// {
+//     $e = new \Exception();
+//     $trace = explode("\n", $e->getTraceAsString());
+//     // reverse array to make steps line up chronologically
+//     $trace = array_reverse($trace);
+//     array_shift($trace); // remove {main}
+//     array_pop($trace); // remove call to this method
+//     $length = count($trace);
+//     $result = array();
+
+//     for ($i = 0; $i < $length; $i++)
+//     {
+//         $result[] = ($i + 1)  . ')' . substr($trace[$i], strpos($trace[$i], ' ')); // replace '#someNum' with '$i)', set the right ordering
+//     }
+
+//     return "\t" . implode("\n\t", $result)."<hr />";
+// }
 
   public function action($call=NULL) {
     if(!$call) $call = $this->calledAction();
@@ -112,7 +174,8 @@ class PwvcController extends PwvcObject {
   }
 
   public function calledAction() {
-    if(!($options = $this->get('options'))) $options = array();
+    if($result = $this->get('calledAction')) return $result;
+    if(!($options = $this->get('options'))) $options = array('route' => '/');
     $result = array('action' => self::DEFAULT_ACTION, 'input' => array());
     if(array_key_exists('action', $options)) {
       $result['action'] = $options['action'];
@@ -127,13 +190,15 @@ class PwvcController extends PwvcObject {
         throw new \WireException(sprintf($this->_('Route "%s" isn’t valid for Page "%s".'), $route, $this->get('page')->path));
       }
     }
+    $this->set('calledAction', $result);
     return $result;
   }
 
   public function routeToAction($route="/") {
     $result = array('action' => self::DEFAULT_ACTION, 'input' => array());
+    if($route === '/') return $result;
     $route_segments = explode('/', rtrim(ltrim($route, '/'), '/'));
-    if(count($route_segments) > 1) {
+    if(count($route_segments) > 0) {
       // maybe a regular action?
       $action = implode('_', $route_segments);
       if($this->validateAction($action)) $result['action'] = $action;

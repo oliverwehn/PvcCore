@@ -18,6 +18,7 @@ class PwvcStack extends PwvcObject {
   function __construct(\Page $page) {
     parent::__construct();
     $this->_initStack($page);
+
   }
 
   // set up stack
@@ -53,28 +54,19 @@ class PwvcStack extends PwvcObject {
   }
 
   public function get($key) {
-    switch ($key) {
-      case 'options': {
-        $controller = $this->get('controller');
-        $result = $controller->get($key);
-        break;
+    if(property_exists(__CLASS__, $key)) {
+      $result = $this->$key;
+    }
+    else {
+      $method = 'get' . \PwvcCore::camelcase($key);
+      if(method_exists($this, $method)) {
+        $result = $this->$method();
       }
-      default: {
-        if(property_exists(__CLASS__, $key)) {
-          $result = $this->$key;
-        }
-        else {
-          $method = 'get' . \PwvcCore::camelcase($key);
-          if(method_exists($this, $method)) {
-            $result = $this->$method();
-          }
-          else {
-            $result = $this->superGet($key);
-            if(!$result) {
-              $model = $this->get('model');
-              $result = $model->get($key);
-            }
-          }
+      else {
+        $result = $this->superGet($key);
+        if(!$result) {
+          $model = $this->get('model');
+          $result = $model->get($key);
         }
       }
     }
@@ -82,22 +74,13 @@ class PwvcStack extends PwvcObject {
   }
 
   public function set($key, $value) {
-    switch ($key) {
-      case 'options': {
-        $controller = $this->get('controller');
-        $controller->set($key, $value);
-        break;
-      }
-      default: {
-        $method = 'set' . \PwvcCore::camelcase($key);
-        if(method_exists($this, $method)) {
-          $this->$method($value);
-        }
-        else {
-          $model = $this->get('model');
-          $model->set($key, $value);
-        }
-      }
+    $method = 'set' . \PwvcCore::camelcase($key);
+    if(method_exists($this, $method)) {
+      $this->$method($value);
+    }
+    else {
+      $model = $this->get('model');
+      $model->set($key, $value);
     }
     return $this;
   }
@@ -107,30 +90,30 @@ class PwvcStack extends PwvcObject {
     return call_user_func(array(&$model, $method), $arguments);
   }
 
-  public function getRoute() {
-    $route = '/';
-    if($action) {
-      // $rou
-    }
-    if($this->validateAction($action)) {
-      if($action !== self::DEFAULT_ACTION) {
-        if(strpos($action, '_'))
-          $action = implode('/', explode('_', $action));
-        $route .= $action . '/';
-      }
-    } else {
-      // get route from urlSegements
-      $i = 0;
-      $routeSegments = array();
-      while(isset($this->input->urlSegments[$i+1])) {
-        $i++;
-        $routeSegments[] = $this->input->urlSegments[$i];
-      }
-      if($i > 0)
-        $route .= implode('/', $routeSegments) . '/';
-    }
-    return $route;
-  }
+  // public function getRoute() {
+  //   $route = '/';
+  //   if($action) {
+  //     // $rou
+  //   }
+  //   if($this->validateAction($action)) {
+  //     if($action !== self::DEFAULT_ACTION) {
+  //       if(strpos($action, '_'))
+  //         $action = implode('/', explode('_', $action));
+  //       $route .= $action . '/';
+  //     }
+  //   } else {
+  //     // get route from urlSegements
+  //     $i = 0;
+  //     $routeSegments = array();
+  //     while(isset($this->input->urlSegments[$i+1])) {
+  //       $i++;
+  //       $routeSegments[] = $this->input->urlSegments[$i];
+  //     }
+  //     if($i > 0)
+  //       $route .= implode('/', $routeSegments) . '/';
+  //   }
+  //   return $route;
+  // }
 
   public function setModel(PwvcModel $model) {
     $this->superSet('model', $model);
@@ -179,12 +162,8 @@ class PwvcStack extends PwvcObject {
     $viewClass = $this->superGet('viewClass');
     $view = new $viewClass($controller);
     // check if view file exists
-    if($view->loadViewFile()) {
-      $this->set('view', $view);
-      return $view;
-    }
-    // if no view file was found, $view === NULL, so don’t use view
-    return NULL;
+    $this->set('view', $view);
+    return $view;
   }
 
 }

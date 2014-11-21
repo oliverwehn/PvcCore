@@ -21,35 +21,34 @@ abstract class PwvcObject extends \WireData {
 
   public function get($key) {
     $result = NULL;
-    $value = parent::get($key);
-    if($value !== NULL) {
-      $result = is_callable($value) ? $value($this) : $value;
+    $method = 'get' . \PwvcCore::camelcase($key);
+    if(method_exists($this, $method)) {
+      $refl_meth = new \ReflectionMethod($this, $method);
+      $result = $refl_meth->isPublic() ? $this->$method() : NULL;
     }
     else {
-      $method = 'get' . \PwvcCore::camelcase($key);
-      if(method_exists($this, $method)) {
-        $refl_meth = new \ReflectionMethod($this, $method);
-        $result = $refl_meth->isPublic() ? $this->$method() : NULL;
+      $value = parent::get($key);
+      if($value !== NULL) {
+        $result = is_callable($value) ? $value($this) : $value;
       }
     }
     return $result;
   }
 
   public function set($key, $value) {
-    $curr_value = parent::get($key);
-    if($curr_value !== NULL) {
-      if(is_callable($curr_value)) {
-        $curr_value($this, $value);
+    $method = 'set' . \PwvcCore::camelcase($key);
+    if(method_exists($this, $method)) {
+      $refl_meth = new \ReflectionMethod($this, $method);
+      if($refl_meth->isPublic()) {
+        $this->$method($value);
         return $this;
       }
     }
     else {
-      $class = get_class($this);
-      $method = 'set' . \PwvcCore::camelcase($key);
-      if(method_exists($this, $method)) {
-        $refl_meth = new \ReflectionMethod($this, $method);
-        if($refl_meth->isPublic()) {
-          $this->$method($value);
+      $curr_value = parent::get($key);
+      if($curr_value !== NULL) {
+        if(is_callable($curr_value)) {
+          $curr_value($this, $value);
           return $this;
         }
       }

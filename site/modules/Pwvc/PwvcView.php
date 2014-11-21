@@ -32,9 +32,8 @@ class PwvcView extends \TemplateFile {
   }
 
   public function ___loadViewFile() {
-    $filename = $this->getViewFilename();
+    $filename = $this->getFilename();
     if(file_exists($filename)) {
-      parent::__construct($filename);
       return $filename;
     }
     else {
@@ -79,6 +78,10 @@ class PwvcView extends \TemplateFile {
 
 
   public function ___render($super=false) {
+    if(!$this->loadViewFile()) {
+      $options = $this->get('options');
+      throw new \WireException(sprintf($this->_('Template file for view "' . get_class($this) . '" on route "' . $options['route'] . '" doesn’t exist.')));
+    }
     if($super) return parent::___render();
 
     $renderer = $this->pwvc->getRenderer();
@@ -86,8 +89,7 @@ class PwvcView extends \TemplateFile {
     $controller->action();
     $scope = $this->buildScope();
     $this->savedDir = getcwd();
-
-    chdir(dirname($this->filename));
+    chdir(dirname($this->get('filename')));
 
     $out = "\n" . $renderer->render($this, $scope) . "\n";
 
@@ -109,19 +111,24 @@ class PwvcView extends \TemplateFile {
   }
 
   public function get($key) {
-    $result = $this->_controller->get($key);
-    if($result === NULL) {
+    if($this->_controller->has($key)) {
+      $result = $this->_controller->get($key);
+    }
+    else {
       $method = 'get' . \PwvcCore::camelcase($key);
       if(method_exists($this, $method)) {
         $result = $this->$method();
       }
+      else {
+        $result = $this->superGet($key);
+      }
     }
-    return $result ? $result : $this->superGet($key);
+    return $result;
   }
 
   public function set($key, $value) {
     $controller = &$this->_controller;
-    if($controller && $controller->get($key) !== NULL) {
+    if($controller && $controller->has($key)) {
       return $controller->set($key, $value);
     }
     else {
@@ -153,17 +160,46 @@ class PwvcView extends \TemplateFile {
     return $this;
   }
 
-  public function ___getViewFilename($templateName=null, $action = null) {
-    $path = $this->pwvc->paths->views;
-    $dir = \PwvcCore::sanitizeFilename($templateName ? $templateName : get_class($this));
-    $path .= $dir . '/';
+  public function setFilename($filename) {
+    $options = $this->get('options');
+    $options['filename'] = $filename;
+    return parent::setFilename($filename);
+  }
+  public function getFilename() {
+    if($filename = $this->superGet('filename')) return $filename;
+    else return $this->getViewFilename();
+  }
+
+  public function setOptions($options) {
+    if(array_key_exists('filename', $options)) {
+      if($options['filename'] === $this->page->template->filename) {
+        unset($options['filename']);
+      }
+    }
+    if(is_object($this->_controller)) {
+      $this->_controller->set('options', $options);
+    }
+    else {
+      throw new \WireException('Tried to set options on controller that isn’t set up, yet.');
+    }
+    return $this;
+  }
+
+  public function ___getViewFilename($action = null) {
+    if(!$action && $filename = $this->superGet('filename')) return $filename;
+    $filename = $this->pwvc->paths->views;
+    $dir = \PwvcCore::sanitizeFilename(get_class($this));
+    $filename .= $dir . '/';
     if(!$action) {
       $controller = $this->get('controller');
       $call = $controller->calledAction();
       $action = $call['action'];
     }
-    $path .= $this->pwvc->getFilename('template', $action);
-    return $path;
+    $filename .= $this->pwvc->getFilename('template', $action);
+    if(!$action) {
+      $this->setFilename($filename);
+    }
+    return $filename;
   }
 
   protected function _initLayout($layoutName) {

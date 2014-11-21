@@ -66,9 +66,15 @@ abstract class PwvcRenderer extends \WireData {
     if(is_numeric($page)) {
       $page = $this->pages->get($page);
     } elseif(is_string($page)) {
-      if(strpos($page, '/')) {
+      if(strpos($page, '=') > 0) {
+        $page = $this->pages->get($page);
+      }
+      elseif(preg_match('#^/?[a-z0-9_\-/]+$#', $page)) {
         $it = $page;
-        $page = $this->pages->get("path=$it");
+        if(strpos($it, '/') > 0) {
+          $it = $this->page->path + '/' + $it;
+        }
+        $page = $this->pages->get("path={$it}");
         if(!$page->id) {
           $urlSegments = array();
           $maxSegments = $this->config->maxUrlSegments;
@@ -83,17 +89,16 @@ abstract class PwvcRenderer extends \WireData {
             $urlSegment = substr($it, $pos);
             $urlSegments[$cnt] = $urlSegment;
             $it = substr($it, 0, $pos); // $it no longer includes the urlSegment
-            $page = $this->pages->get("path=$it, status<" . Page::statusMax);
+            $page = $this->pages->get("path=$it, status<" . \Page::statusMax);
             $cnt++;
           }
-          $options['route'] = implode('/', $urlSegments);
-
-          $page = $this->pages->get($page);
+          $options['route'] = '/' . (count($urlSegments) > 0 ? implode('/', $urlSegments) . '/' : '');
+          $page = $this->pages->get($page->id);
         }
       }
       else $page = $this->pages->get('name=' . $page);
     }
-    if(!$page instanceof \Page) return false;
+    if(!($page instanceof \Page)) return false;
     return $page->render($options);
   }
 

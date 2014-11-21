@@ -69,6 +69,8 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     // set global pwvc var
     Wire::setFuel('pwvc', $this);
 
+    // manipulate render event
+    // $this->addHookBefore('PageRender::renderPage', $this, 'renderView');
     $this->addHookBefore('PageRender::renderPage', $this, 'renderView');
 
     // set up renderer
@@ -116,46 +118,12 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $oEvent = $event->arguments(0);
     $module = $event->object;
     $page = $oEvent->object;
-    $oEvent->replace = true;
-    if($this->input->urlSegments) {
-      $options = $oEvent->arguments(1);
-      if(!is_array($options)) $options = array();
-      $urlSegments = array();
-      for($i=0, $cnt=$this->input->urlSegments->count; $i<$cnt; $i++) {
-        $urlSegments[] = $this->input->urlSegments($i);
-      }
-      $options['route'] = implode('/', $urlSegments);
-      $oEvent->arguments[1] = $options;
-    }
+    // $oEvent->replace = true;
     if($page->template == 'admin') return;
     $stack = new Pwvc\PwvcStack($page);
     $oEvent->object = $stack;
-    $module->___renderPage($oEvent);
-  }
-
-  /**
-   * Determine route
-   */
-  public function get_route($action = NULL) {
-    $route = '/';
-    if($this->validate_action($action)) {
-      if($action !== self::DEFAULT_ACTION) {
-        if(strpos($action, '_'))
-          $action = implode('/', explode('_', $action));
-        $route .= $action . '/';
-      }
-    } else {
-      // get route from urlSegements
-      $i = 0;
-      $routeSegments = array();
-      while(isset($this->input->urlSegments[$i+1])) {
-        $i++;
-        $routeSegments[] = $this->input->urlSegments[$i];
-      }
-      if($i > 0)
-        $route .= implode('/', $routeSegments) . '/';
-    }
-    return $route;
+    // $module->___renderPage($oEvent);
+    $event = $oEvent;
   }
 
   /**
