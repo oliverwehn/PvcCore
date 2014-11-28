@@ -14,9 +14,6 @@
  * associated controllers and actions
  *
  */
-require_once('PwvcObject.php');
-require_once('PwvcStack.php');
-require_once('PwvcModel.php');
 require_once('PwvcView.php');
 require_once('PwvcLayout.php');
 require_once('PwvcController.php');
@@ -38,7 +35,6 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
         $defaults = array(
                     'appControllerPath' => 'site/templates/',
                     'layoutsPath' => 'site/templates/layouts/',
-                    'modelsPath' => 'site/templates/models/',
                     'controllersPath' => 'site/templates/controllers/',
                     'viewsPath' => 'site/templates/views/',
                     'snippetsPath' => 'site/templates/snippets/',
@@ -85,7 +81,6 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $pwvc_paths = new Paths($this->config->paths->get('root'));
     $pwvc_urls = new Paths($this->config->urls->templates);
     $pwvc_paths->set('appController', $this->_getDefaultPath('appController'));
-    $pwvc_paths->set('models', $this->_getDefaultPath('models'));
     $pwvc_paths->set('views',  $this->_getDefaultPath('views'));
     $pwvc_paths->set('controllers', $this->_getDefaultPath('controllers'));
     $pwvc_paths->set('layouts', $this->_getDefaultPath('layouts'));
@@ -120,11 +115,48 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $page = $oEvent->object;
     // $oEvent->replace = true;
     if($page->template == 'admin') return;
-    $stack = new Pwvc\PwvcStack($page);
-    $oEvent->object = $stack;
+    $page->addHook('output', $this, 'output');
+    $oEvent->object = $this;
     // $module->___renderPage($oEvent);
     $event = $oEvent;
   }
+
+  /**
+   * Render page output, replaces $page->output()
+   * @method output
+   * @param bool $forceNew Forces it to return a new (non-cached) TemplateFile object (default=false)
+   * @return PwvcView (extends TemplateFile)
+   */
+  public function output($event) {
+    $page = $event->object;
+    $forceNew = $event->arguments(0);
+    $templateName = $page->template->name;
+    $controllerClass = self::getControllerName($templateName);
+    $controller = Pwvc\PwvcController::extend($controllerClass);
+    $view = new Pwvc\PwvcView($controller);
+    // use existing view, when existing and !$forceNew
+    if($view instanceof PwvcView && !$forceNew) return $view;
+    // else create a new view
+    $model = $this->get('model');
+    if(!$model->template) return NULL;
+    $controller = $this->get('controller');
+    // set up view
+    $viewClass = $this->get('viewClass');
+    $view = new $viewClass($controller);
+    // check if view file exists
+    $this->set('view', $view);
+    return $view;
+  }
+
+  public function get($key) {
+    switch($key) {
+      default: {
+        return ::get($key);
+      }
+    }
+  }
+
+  publuc
 
   /**
    * Handling renderer
@@ -133,14 +165,13 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   private function initRenderer($rendererName = NULL) {
     $class = 'PwvcRenderer';
     if(!is_string($rendererName)) $rendererName = $this->cfgRendererName;
-    $instanceOf = self::NS . '\\' . $class;
-    $classNs = $instanceOf . $this->camelcase($rendererName);
+    $instanceOf = $class;
     $class .= $this->camelcase($rendererName);
-    if(!class_exists($classNs)) {
+    if(!class_exists($class)) {
       $rendererPath = $this->cleanPath(dirname(__FILE__));
       require_once($rendererPath . $class . '.php');
     }
-    $renderer = new $classNs;
+    $renderer = new $class;
     if(!($renderer instanceof $instanceOf)) {
       throw new WireException(sprintf($this->_('Renderer "%s" can’t be initialized.'), $class));
     }
@@ -226,7 +257,6 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   public static function ext($type, $renderer=null) {
     $rendererClass = wire('pwvc')->renderer;
     if(!$rendererClass) $rendererClass = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
-    $rendererClassNs = 'Pwvc\\' . $rendererClass;
     $exts = array(
       'models' => '.model.php',
       'controllers' => '.controller.php',
@@ -236,10 +266,13 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
       'snippets' => '.snippet.php'
     );
     return $exts[$type . 's'];
-    return $rendererClassNs::ext($type);
+    return $rendererClass::ext($type);
   }
 
-
+  // Sanitize controller name
+  public static function getControllerName($templateName, $ns=true) {
+    return self::getClassName($templateName, 'controller', $ns);
+  }
 
   // Sanitize controller name
   public static function getClassName($templateName, $suffix='', $ns=true) {

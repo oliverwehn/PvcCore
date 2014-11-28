@@ -11,9 +11,8 @@
  * methods. Don’t modifiy.
  *
  */
-namespace Pwvc;
 
-class PwvcStack extends \WireData {
+class PwvcStack extends WireData {
 
   function __construct(\Page $page) {
     parent::__construct();

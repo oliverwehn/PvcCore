@@ -10,8 +10,6 @@
  * Don’t modifiy.
  *
  */
-namespace Pwvc;
-
 class PwvcLayout extends PwvcView {
 
   public function ___loadLayoutFile() {

@@ -15,9 +15,8 @@
  * methods. Don’t modifiy.
  *
  */
-namespace Pwvc;
 
-class PwvcController extends \WireData {
+class PwvcController extends WireData {
 
   const DEFAULT_ACTION = 'index';
 
@@ -28,14 +27,14 @@ class PwvcController extends \WireData {
   /**
    * Initialization and setup
    */
-  public function __construct(\Page $model) {
+  public function __construct(Page $model) {
     $this->set('model', $model);
-    $this->set('assets', new \WireArray);
+    $this->set('assets', new WireArray);
     $this->init();
   }
 
   public function init() {
-    $this->set('layout', \PwvcCore::DEFAULT_LAYOUT);
+    $this->set('layout', PwvcCore::DEFAULT_LAYOUT);
   }
 
   public function get($key) {
@@ -53,7 +52,7 @@ class PwvcController extends \WireData {
           do {
             $element = $element->get($keySegments[$i]);
             if($i < $keySegmentsCount - 1 && !method_exists($result, 'get')) {
-              throw new \WireException(sprintf($this->_('"%s" has no method "get" to get key "%s".'), implode('.', $keySegmentsPath), $keySegmentsPath[$i+1]));
+              throw new WireException(sprintf($this->_('"%s" has no method "get" to get key "%s".'), implode('.', $keySegmentsPath), $keySegmentsPath[$i+1]));
             }
             $i++;
           }
@@ -89,7 +88,7 @@ class PwvcController extends \WireData {
             $element = $element->get($keySegments[$i]);
             $keySegmentsPath[] = $keySegments[$i];
             if(!method_exists($element, 'get')) {
-              throw new \WireException(sprintf($this->_('"%s" has no method "get" to get key "%s".'), implode('.', $keySegmentsPath), $keySegmentsPath[$i+1]));
+              throw new WireException(sprintf($this->_('"%s" has no method "get" to get key "%s".'), implode('.', $keySegmentsPath), $keySegmentsPath[$i+1]));
             }
             $i++;
           }
@@ -127,7 +126,7 @@ class PwvcController extends \WireData {
     if(!$call) $call = $this->calledAction();
     if(!is_array($call)) $call = array('action' => $call, 'input' => array());
     if(count($call['input']))
-      $this->input->route = new \WireInputData($call['input']);
+      $this->input->route = new WireInputData($call['input']);
     if($this->call($call['action'])) {
       $result = array();
       if($model = $this->get('model')) {
@@ -147,7 +146,7 @@ class PwvcController extends \WireData {
 
   public function validateAction($action) {
     if(!is_string($action)) return FALSE;
-    $reflMeth = new \ReflectionMethod($this, $action);
+    $reflMeth = new ReflectionMethod($this, $action);
     if($reflMeth->isPublic()) {
       return TRUE;
     } else {
@@ -418,5 +417,24 @@ class PwvcController extends \WireData {
 
   protected function _ext($type, $subtype=NULL) {
     return ProcessPwvc::ext($type, $this->pwvc->template_engine);
+  }
+
+  public static function extend($className) {
+    $args = func_get_args();
+    $initWith = array();
+    foreach($args as $i=>$v) {
+      if($i > 0) {
+        $initWith[] = $v;
+      }
+    }
+    $classCode = "
+    namespace Pwvc;
+    class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $className) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
+      public function __constructor(" . implode(', ', $initWith) .") {
+        parent::__constructor(" . implode(', ', $initWith) .");
+      }
+    }
+    ";
+    eval($classCode);
   }
 }

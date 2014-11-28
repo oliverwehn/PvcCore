@@ -10,7 +10,6 @@
  * PHP and PW API calls.
  *
  */
-namespace Pwvc;
 
 class PwvcRendererNative extends PwvcRenderer {
 

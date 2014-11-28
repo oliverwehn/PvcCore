@@ -10,9 +10,8 @@
  * that provides basic functionality.
  *
  */
-namespace Pwvc;
 
-abstract class PwvcRenderer extends \WireData {
+abstract class PwvcRenderer extends WireData {
 
   // Name of renderer, used to address it from Pwvc module
   const RENDERER_NAME = '';

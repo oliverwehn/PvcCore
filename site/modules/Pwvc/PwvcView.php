@@ -10,9 +10,8 @@
  * Don’t modifiy.
  *
  */
-namespace Pwvc;
 
-class PwvcView extends \TemplateFile {
+class PwvcView extends TemplateFile {
 
   protected $_controller;
 
@@ -67,7 +66,7 @@ class PwvcView extends \TemplateFile {
   public function ___render($super=false) {
     if(!$this->loadViewFile()) {
       $options = $this->get('options');
-      throw new \WireException(sprintf($this->_('Template file for view "' . get_class($this) . '" on route "' . $options['route'] . '" doesn’t exist.')));
+      throw new WireException(sprintf($this->_('Template file for view "' . get_class($this) . '" on route "' . $options['route'] . '" doesn’t exist.')));
     }
     if($super) return parent::___render();
     $renderer = $this->pwvc->getRenderer();
@@ -102,12 +101,12 @@ class PwvcView extends \TemplateFile {
       return $out;
     }
     else {
-      throw new \WireException(sprintf($this->_('Failed to perform action on controller "' . get_class($controller) . '".')));
+      throw new WireException(sprintf($this->_('Failed to perform action on controller "' . get_class($controller) . '".')));
     }
   }
 
   public function get($key) {
-    $method = 'get' . \PwvcCore::camelcase($key);
+    $method = 'get' . PwvcCore::camelcase($key);
     if(method_exists($this, $method)) {
       $result = $this->$method();
     }
@@ -118,7 +117,7 @@ class PwvcView extends \TemplateFile {
   }
 
   public function set($key, $value) {
-    $method = 'set' . \PwvcCore::camelcase($key);
+    $method = 'set' . PwvcCore::camelcase($key);
     if(method_exists($this, $method)) {
       return $this->$method($value);
     }
@@ -158,7 +157,7 @@ class PwvcView extends \TemplateFile {
       $this->_controller->set('options', $options);
     }
     else {
-      throw new \WireException('Tried to set options on controller that isn’t set up, yet.');
+      throw new WireException('Tried to set options on controller that isn’t set up, yet.');
     }
     return $this;
   }
@@ -166,7 +165,7 @@ class PwvcView extends \TemplateFile {
   public function ___getViewFilename($action = null) {
     if(!$action && $filename = parent::get('filename')) return $filename;
     $filename = $this->pwvc->paths->views;
-    $dir = \PwvcCore::sanitizeFilename(get_class($this));
+    $dir = PwvcCore::sanitizeFilename(get_class($this));
     $filename .= $dir . '/';
     if(!$action) {
       $controller = $this->get('controller');
@@ -181,9 +180,9 @@ class PwvcView extends \TemplateFile {
   }
 
   protected function _initLayout($layoutName) {
-    $class = \PwvcCore::getClassname($layoutName, 'layout');
+    $class = PwvcCore::getClassname($layoutName, 'layout');
     if($class && !class_exists($class)) {
-      $classFile = \PwvcCore::getFilename('layout', $class);
+      $classFile = PwvcCore::getFilename('layout', $class);
       $classPath = $this->pwvc->paths->layouts . $classFile;
       // check if class file exists
       if(file_exists($classPath)) {
@@ -193,7 +192,7 @@ class PwvcView extends \TemplateFile {
       // check again
       if(!class_exists($class)) {
         // fall back to creating class on demand
-        $base_class = \PwvcCore::getClassname('Pwvc', 'layout');
+        $base_class = PwvcCore::getClassname('Pwvc', 'layout');
         $base_class::extend($class, '$controller');
       }
     }
@@ -212,8 +211,7 @@ class PwvcView extends \TemplateFile {
       }
     }
     $classCode = "
-    namespace Pwvc;
-    class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $className) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
+    class " . preg_replace($className . " extends " . get_called_class() . " {
       public function __constructor(" . implode(', ', $initWith) .") {
         parent::__constructor(" . implode(', ', $initWith) .");
       }

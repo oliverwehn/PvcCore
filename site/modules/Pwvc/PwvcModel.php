@@ -11,8 +11,6 @@
  * methods. Don’t modifiy.
  *
  */
-namespace Pwvc;
-
 class PwvcModel extends PwvcObject {
 
   protected $_page = null;
