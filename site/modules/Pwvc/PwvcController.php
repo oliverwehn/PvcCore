@@ -20,15 +20,15 @@ class PwvcController extends WireData {
 
   const DEFAULT_ACTION = 'index';
 
-  protected $_model;
+  protected $_page;
 
   protected $routes = array();
 
   /**
    * Initialization and setup
    */
-  public function __construct(Page $model) {
-    $this->set('model', $model);
+  public function __construct(PwvcPageProxy $page) {
+    $this->set('page', $page);
     $this->set('assets', new WireArray);
     $this->init();
   }
@@ -39,87 +39,35 @@ class PwvcController extends WireData {
 
   public function get($key) {
     switch($key) {
-      case 'model': {
-        return $this->_model;
+      case 'page': {
+        return $this->_page;
         break;
       }
       default: {
-        if(strpos($key, '.') !== FALSE) {
-          $keySegments = explode('.', $key);
-          $keySegmentsCount = count($keySegments);
-          $i = 0;
-          $element = $this;
-          do {
-            $element = $element->get($keySegments[$i]);
-            if($i < $keySegmentsCount - 1 && !method_exists($result, 'get')) {
-              throw new WireException(sprintf($this->_('"%s" has no method "get" to get key "%s".'), implode('.', $keySegmentsPath), $keySegmentsPath[$i+1]));
-            }
-            $i++;
-          }
-          while($i < $keySegmentsCount);
-          return $element;
+        $method = 'get' . PwvcCore::camelcase($key);
+        if(method_exists($this, $method)) {
+          return $this->$method();
         }
-        else {
-          return parent::get($key);
-        }
+        return parent::get($key);
       }
     }
   }
 
   public function set($key, $value) {
     switch($key) {
-      case 'options': {
-        return $this->setOptions($value);
-        break;
-      }
-      case 'model': {
-        $this->_model = $value;
+      case 'page': {
+        $this->_page = $value;
         return $this;
         break;
       }
       default: {
-        if(strpos($key, '.') !== FALSE) {
-          $keySegments = explode('.', $key);
-          $keySegmentsCount = count($keySegments);
-          $keySegmentsPath = array();
-          $i = 0;
-          $element = $this;
-          do {
-            $element = $element->get($keySegments[$i]);
-            $keySegmentsPath[] = $keySegments[$i];
-            if(!method_exists($element, 'get')) {
-              throw new WireException(sprintf($this->_('"%s" has no method "get" to get key "%s".'), implode('.', $keySegmentsPath), $keySegmentsPath[$i+1]));
-            }
-            $i++;
-          }
-          while($i < $keySegmentsCount - 1);
-          return $element->set($keySegments[$i], $value);
+        $method = 'set' . PwvcCore::camelcase($key);
+        if(method_exists($this, $method)) {
+          return $this->$method($value);
         }
-        else {
-          return parent::set($key, $value);
-        }
+        return parent::set($key, $value);
       }
     }
-  }
-
-  public function setOptions(Array $options) {
-    $currOptions = $this->get('options');
-    if(!is_array($currOptions)) {
-      $currOptions = array();
-    }
-    if(array_key_exists('pageStack', $options) && count($options['pageStack']) == 0) {
-      if(!array_key_exists('route', $options)) {
-        $urlSegments = array();
-        if($this->input->urlSegments) {
-          for($i=0, $cnt=$this->input->urlSegments->count; $i<$cnt; $i++) {
-            $urlSegments[] = $this->input->urlSegments($i);
-          }
-        }
-        $options['route'] = '/' . (count($urlSegments) > 0 ? implode('/', $urlSegments) . '/' : '');
-      }
-    }
-    $options = array_merge($currOptions, $options);
-    return parent::set('options', $options);
   }
 
   public function action($call=NULL) {
@@ -420,21 +368,14 @@ class PwvcController extends WireData {
   }
 
   public static function extend($className) {
-    $args = func_get_args();
-    $initWith = array();
-    foreach($args as $i=>$v) {
-      if($i > 0) {
-        $initWith[] = $v;
+    $classCode = '
+    class '. $className . ' extends ' . get_called_class() . ' {
+      public function __constructor(PwvcPageProxy $page) {
+        parent::__constructor($page);
       }
     }
-    $classCode = "
-    namespace Pwvc;
-    class " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', $className) . " extends " . preg_replace('#^' . __NAMESPACE__ . '\\\#', '', get_called_class()) . " {
-      public function __constructor(" . implode(', ', $initWith) .") {
-        parent::__constructor(" . implode(', ', $initWith) .");
-      }
-    }
-    ";
+    ';
     eval($classCode);
+    return class_exists($className);
   }
 }

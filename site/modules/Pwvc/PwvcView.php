@@ -66,7 +66,7 @@ class PwvcView extends TemplateFile {
   public function ___render($super=false) {
     if(!$this->loadViewFile()) {
       $options = $this->get('options');
-      throw new WireException(sprintf($this->_('Template file for view "' . get_class($this) . '" on route "' . $options['route'] . '" doesn’t exist.')));
+      throw new WireException(sprintf($this->_('Template file for view "%s" on route "%s" doesn’t exist.'), get_class($this), $options['route']));
     }
     if($super) return parent::___render();
     $renderer = $this->pwvc->getRenderer();
@@ -211,7 +211,7 @@ class PwvcView extends TemplateFile {
       }
     }
     $classCode = "
-    class " . preg_replace($className . " extends " . get_called_class() . " {
+    class " . $className . " extends " . get_called_class() . " {
       public function __constructor(" . implode(', ', $initWith) .") {
         parent::__constructor(" . implode(', ', $initWith) .");
       }

@@ -14,6 +14,7 @@
  * associated controllers and actions
  *
  */
+require_once('PwvcPageProxy.php');
 require_once('PwvcView.php');
 require_once('PwvcLayout.php');
 require_once('PwvcController.php');
@@ -113,50 +114,35 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $oEvent = $event->arguments(0);
     $module = $event->object;
     $page = $oEvent->object;
+    $options = $oEvent->arguments(0);
+    if(is_string($options)) $options = $oEvent->arguments(1);
+    if(!is_array($options)) $options = array();
+    $this->_getActionRoute($options);
     // $oEvent->replace = true;
     if($page->template == 'admin') return;
-    $page->addHook('output', $this, 'output');
-    $oEvent->object = $this;
+    // $page->addHook('output', $this, 'output');
+    $oEvent->object = new PwvcPageProxy($page);
     // $module->___renderPage($oEvent);
     $event = $oEvent;
   }
 
   /**
-   * Render page output, replaces $page->output()
-   * @method output
-   * @param bool $forceNew Forces it to return a new (non-cached) TemplateFile object (default=false)
-   * @return PwvcView (extends TemplateFile)
+   * Get action route
    */
-  public function output($event) {
-    $page = $event->object;
-    $forceNew = $event->arguments(0);
-    $templateName = $page->template->name;
-    $controllerClass = self::getControllerName($templateName);
-    $controller = Pwvc\PwvcController::extend($controllerClass);
-    $view = new Pwvc\PwvcView($controller);
-    // use existing view, when existing and !$forceNew
-    if($view instanceof PwvcView && !$forceNew) return $view;
-    // else create a new view
-    $model = $this->get('model');
-    if(!$model->template) return NULL;
-    $controller = $this->get('controller');
-    // set up view
-    $viewClass = $this->get('viewClass');
-    $view = new $viewClass($controller);
-    // check if view file exists
-    $this->set('view', $view);
-    return $view;
-  }
-
-  public function get($key) {
-    switch($key) {
-      default: {
-        return ::get($key);
+  private function _getActionRoute(Array &$options) {
+    if((!array_key_exists('pageStack', $options)) || (count($options['pageStack']) == 0)) {
+      if(!array_key_exists('route', $options)) {
+        $urlSegments = array();
+        if($this->input->urlSegments) {
+          for($i=0, $cnt=$this->input->urlSegments->count; $i<$cnt; $i++) {
+            $urlSegments[] = $this->input->urlSegments($i);
+          }
+        }
+        $options['route'] = '/' . (count($urlSegments) > 0 ? implode('/', $urlSegments) . '/' : '');
       }
     }
+    return $options;
   }
-
-  publuc
 
   /**
    * Handling renderer
@@ -270,15 +256,14 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   // Sanitize controller name
-  public static function getControllerName($templateName, $ns=true) {
-    return self::getClassName($templateName, 'controller', $ns);
+  public static function getControllerName($templateName) {
+    return self::getClassName($templateName, 'controller');
   }
 
   // Sanitize controller name
-  public static function getClassName($templateName, $suffix='', $ns=true) {
+  public static function getClassName($templateName, $suffix='') {
     $suffix = is_string($suffix) ? self::camelcase($suffix) : '';
     $className = self::camelcase($templateName) . $suffix;
-    if($ns) $className = self::NS . "\\" . $className;
     return $className;
   }
 
