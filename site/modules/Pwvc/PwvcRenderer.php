@@ -96,7 +96,7 @@ abstract class PwvcRenderer extends \WireData {
           $page = $this->pages->get($page->id);
         }
       }
-      else $page = $this->pages->get('name=' . $page);
+      else $page = $this->pages->get('name=' . $page);;
     }
     if(!($page instanceof \Page)) return false;
     return $page->render($options);
@@ -182,6 +182,21 @@ abstract class PwvcRenderer extends \WireData {
   //     return call_user_func(array($this, '_get_markup'), $name, count($arguments)?$arguments[0]:null);
   //   }
   // }
+
+  protected function _declareTemplateFunc($name) {
+    return eval('
+      function ' . $name . '() {
+        $func = __FUNCTION__;
+        $args = func_get_args();
+        if($pwvc = wire(\'pwvc\')) {
+          $renderer = $pwvc->getRenderer();
+          $tempFunc = $renderer->getTemplateFunc($func);
+          return call_user_func_array($tempFunc, $args);
+        }
+        else return false;
+      }
+    ');
+  }
 
   private function _get_config_value($key) {
     if(!$this->module_config) {

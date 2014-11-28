@@ -26,7 +26,7 @@ class PwvcView extends \TemplateFile {
     $this->set('_controller', $controller);
     $fuel = self::getAllFuel();
     $this->set('wire', $fuel);
-    foreach($fuel as $key => $value) $this->superSet($key, $value);
+    foreach($fuel as $key => $value) $this->set($key, $value);
     $page = $this->page;
 
   }
@@ -41,34 +41,21 @@ class PwvcView extends \TemplateFile {
     }
   }
 
-  public function ___buildScope($layer = NULL, $stack = NULL) {
+  public function ___buildScope() {
     $scope = array();
-    if($layer === NULL) {
-      $layer = $this;
-      $stack = array('view', 'controller', 'model', 'page');
-      array_shift($stack);
-      $scope = array_merge($this->buildScope($this, $stack), $scope);
-    }
-    else {
-      if($layer instanceof PwvcView) {
-         $properties = $layer->wire->getArray();
-      }
-      else {
-        $properties = $layer->getArray();
-      }
-      foreach($properties as $k=>$v) {
+    $properties = array(
+      $this->getArray(),
+
+    );
+    foreach($properties as $propSet) {
+      foreach($propSet as $k=>$v) {
         if(array_key_exists($k, $scope)) {
           $scope[$k] = null;
         }
         $scope[$k] = $this->$k;
         unset($v);
       }
-      if(count($stack) >= 1) {
-        $nextLayer = '_' . array_shift($stack);
-        $scope = array_merge($this->buildScope($layer->$nextLayer, $stack), $scope);
-      }
     }
-
     return $scope;
   }
 
@@ -83,67 +70,58 @@ class PwvcView extends \TemplateFile {
       throw new \WireException(sprintf($this->_('Template file for view "' . get_class($this) . '" on route "' . $options['route'] . '" doesn’t exist.')));
     }
     if($super) return parent::___render();
-
     $renderer = $this->pwvc->getRenderer();
     $controller = &$this->_controller;
-    $controller->action();
-    $scope = $this->buildScope();
-    $this->savedDir = getcwd();
-    chdir(dirname($this->get('filename')));
+    if($result = $controller->action()) {
+      // $scope = $this->buildScope();
+      $scope = $this->buildScope();
+      foreach($result as $k => $v) {
+        // $this->set($k, $v);
+        $scope[$k] = $v;
+      }
 
-    $out = "\n" . $renderer->render($this, $scope) . "\n";
+      $this->savedDir = getcwd();
+      chdir(dirname($this->get('filename')));
 
-    if(count($this->options['pageStack']) == 0) {
-      $layoutName = $this->_controller->get('layout');
-      if($layoutName != NULL) {
-        $layout = $this->_initLayout($layoutName);
-        if($layout->loadLayoutFile()) {
-          $scope['outlet'] = $out;
-          $layout->importScope($scope);
-          $out = $layout->render();
+      $out = "\n" . $renderer->render($this, $scope) . "\n";
+
+      if(count($this->options['pageStack']) == 0) {
+        $layoutName = $this->_controller->get('layout');
+        if($layoutName != NULL) {
+          $layout = $this->_initLayout($layoutName);
+          if($layout->loadLayoutFile()) {
+            $scope['outlet'] = $out;
+            $layout->importScope($scope);
+            $out = $layout->render();
+          }
         }
       }
+
+      if($this->savedDir) chdir($this->savedDir);
+
+      return $out;
     }
-
-    if($this->savedDir) chdir($this->savedDir);
-
-    return $out;
+    else {
+      throw new \WireException(sprintf($this->_('Failed to perform action on controller "' . get_class($controller) . '".')));
+    }
   }
 
   public function get($key) {
-    if($this->_controller->has($key)) {
-      $result = $this->_controller->get($key);
+    $method = 'get' . \PwvcCore::camelcase($key);
+    if(method_exists($this, $method)) {
+      $result = $this->$method();
     }
     else {
-      $method = 'get' . \PwvcCore::camelcase($key);
-      if(method_exists($this, $method)) {
-        $result = $this->$method();
-      }
-      else {
-        $result = $this->superGet($key);
-      }
+      $result = parent::get($key);
     }
     return $result;
   }
 
   public function set($key, $value) {
-    $controller = &$this->_controller;
-    if($controller && $controller->has($key)) {
-      return $controller->set($key, $value);
+    $method = 'set' . \PwvcCore::camelcase($key);
+    if(method_exists($this, $method)) {
+      return $this->$method($value);
     }
-    else {
-      $method = 'set' . \PwvcCore::camelcase($key);
-      if(method_exists($this, $method)) {
-        return $this->$method($value);
-      }
-    }
-    return $this->superSet($key, $value);
-  }
-
-  public function superGet($key) {
-    return parent::get($key);
-  }
-  public function superSet($key, $value) {
     return parent::set($key, $value);
   }
 
@@ -166,7 +144,7 @@ class PwvcView extends \TemplateFile {
     return parent::setFilename($filename);
   }
   public function getFilename() {
-    if($filename = $this->superGet('filename')) return $filename;
+    if($filename = parent::get('filename')) return $filename;
     else return $this->getViewFilename();
   }
 
@@ -186,7 +164,7 @@ class PwvcView extends \TemplateFile {
   }
 
   public function ___getViewFilename($action = null) {
-    if(!$action && $filename = $this->superGet('filename')) return $filename;
+    if(!$action && $filename = parent::get('filename')) return $filename;
     $filename = $this->pwvc->paths->views;
     $dir = \PwvcCore::sanitizeFilename(get_class($this));
     $filename .= $dir . '/';
@@ -197,7 +175,7 @@ class PwvcView extends \TemplateFile {
     }
     $filename .= $this->pwvc->getFilename('template', $action);
     if(!$action) {
-      $this->setFilename($filename);
+      parent::setFilename($filename);
     }
     return $filename;
   }

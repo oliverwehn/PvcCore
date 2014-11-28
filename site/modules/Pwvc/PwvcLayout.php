@@ -39,8 +39,6 @@ class PwvcLayout extends PwvcView {
     if($super) return \TemplateFile::___render();
 
     $renderer = $this->pwvc->getRenderer();
-    $controller = &$this->_controller;
-    $controller->action();
     if(!($scope = $this->get('scope'))) {
       $scope = $this->buildScope();
     }

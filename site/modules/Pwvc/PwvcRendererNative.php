@@ -24,28 +24,35 @@ class PwvcRendererNative extends PwvcRenderer {
 
 
   public function ___render(PwvcView $view, Array $scope) {
+    $this->setTemplateFuncs($scope);
 
-    extract($scope);
-
-    if(!($templateFuncs = $this->getTemplateFuncs())) {
-      $this->setTemplateFuncs($scope);
-      $templateFuncs = $this->getTemplateFuncs();
+    // foreach($scope as $k => $v) {
+    //   echo $k.", ";
+    //   // if(is_callable($v) && $v instanceof \Closure) $scope[$k] = $v();
+    //   // $$k = $v;
+    //   if($k !== 'database')
+    //     $$k = $v;
+    // }
+    //extract($scope);
+    $templateFuncs = array();
+    foreach($scope as $k=>&$v) {
+      if($v instanceof \Closure) {
+        $this->setTemplateFunc($k, $v);
+      }
+      else {
+        $$k = $v;
+      }
+      unset($v);
     }
+    //extract($templateScope);
+
+    // if(!($templateFuncs = $this->getTemplateFuncs())) {
+      $templateFuncs = $this->getTemplateFuncs();
+    // }
     // extract($templateFuncs);
     foreach($templateFuncs as $k => $f) {
       if(!function_exists($k)) {
-        eval('
-              function ' . $k . '() {
-                $func = __FUNCTION__;
-                $args = func_get_args();
-                if($pwvc = wire(\'pwvc\')) {
-                  $renderer = $pwvc->getRenderer();
-                  $tempFunc = $renderer->getTemplateFunc($func);
-                  return call_user_func_array($tempFunc, $args);
-                }
-                else return false;
-              }
-            ');
+        $this->_declareTemplateFunc($k);
       }
     }
 
@@ -101,6 +108,18 @@ class PwvcRendererNative extends PwvcRenderer {
 
   public function getTemplateFuncs() {
     return $this->get('templateFuncs');
+  }
+
+  public function setTemplateFunc($key, \Closure $closure) {
+    $templateFuncs =& $this->data['templateFuncs'];
+    if(!array_key_exists($key, $templateFuncs)) {
+      $templateFuncs[$key] = $closure;
+      return $key;
+    }
+    else {
+      return false;
+    }
+
   }
 
   public function getTemplateFunc($key) {

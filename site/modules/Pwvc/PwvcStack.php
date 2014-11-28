@@ -13,22 +13,22 @@
  */
 namespace Pwvc;
 
-class PwvcStack extends PwvcObject {
+class PwvcStack extends \WireData {
 
   function __construct(\Page $page) {
     parent::__construct();
     $this->_initStack($page);
-
   }
 
   // set up stack
   private function _initStack(\Page $page) {
     $templateName = $page->template->name;
-    $stack = array('model', 'controller', 'view');
+    $stack = array('controller', 'view');
+    $this->set('model', $page);
     $initWith = $page;
     foreach($stack as $layer) {
       $class = \PwvcCore::getClassName($templateName, $layer);
-      $this->superSet($layer . 'Class', $class);
+      $this->set($layer . 'Class', $class);
       if($class && !class_exists($class)) {
         $classFile = \PwvcCore::getFilename($layer, $class);
         $layerPlural = $layer . 's';
@@ -54,35 +54,48 @@ class PwvcStack extends PwvcObject {
   }
 
   public function get($key) {
-    if(property_exists(__CLASS__, $key)) {
-      $result = $this->$key;
-    }
-    else {
-      $method = 'get' . \PwvcCore::camelcase($key);
-      if(method_exists($this, $method)) {
-        $result = $this->$method();
+    switch($key) {
+      case 'template': {
+        $model = $this->get('model');
+        return $model->get('template');
+        break;
       }
-      else {
-        $result = $this->superGet($key);
-        if(!$result) {
-          $model = $this->get('model');
-          $result = $model->get($key);
+      default: {
+        if(property_exists(__CLASS__, $key)) {
+          $result = $this->$key;
         }
+        else {
+          $method = 'get' . \PwvcCore::camelcase($key);
+          if(method_exists($this, $method)) {
+            $result = $this->$method();
+          }
+          else {
+            $result = parent::get($key);
+          }
+        }
+        return $result;
       }
     }
-    return $result;
   }
 
   public function set($key, $value) {
-    $method = 'set' . \PwvcCore::camelcase($key);
-    if(method_exists($this, $method)) {
-      $this->$method($value);
+    switch($key) {
+      case 'template': {
+        $model = $this->get('model');
+        return $model->set('template', $value);
+        break;
+      }
+      default: {
+        $method = 'set' . \PwvcCore::camelcase($key);
+        if(method_exists($this, $method)) {
+          $this->$method($value);
+        }
+        else {
+          parent::set($key, $value);
+        }
+        return $this;
+      }
     }
-    else {
-      $model = $this->get('model');
-      $model->set($key, $value);
-    }
-    return $this;
   }
 
   public function __call($method, $arguments) {
@@ -115,23 +128,23 @@ class PwvcStack extends PwvcObject {
   //   return $route;
   // }
 
-  public function setModel(PwvcModel $model) {
-    $this->superSet('model', $model);
+  public function setModel(\Page $model) {
+    parent::set('model', $model);
     return $this;
   }
   public function getModel() {
-    return $this->superGet('model');
+    return parent::get('model');
   }
   public function setController(PwvcController $controller) {
-    $this->superSet('controller', $controller);
+    parent::set('controller', $controller);
     return $this;
   }
   public function getController() {
-    return $this->superGet('controller');
+    return parent::get('controller');
   }
   public function setView($view) {
     if($view instanceof PwvcView || $view === NULL) {
-      $this->superSet('view', $view);
+      parent::set('view', $view);
 
     }
     else {
@@ -140,7 +153,7 @@ class PwvcStack extends PwvcObject {
     return $this;
   }
   public function getView() {
-    return $this->superGet('view');
+    return parent::get('view');
   }
 
   /**
@@ -159,7 +172,7 @@ class PwvcStack extends PwvcObject {
     if(!$model->template) return NULL;
     $controller = $this->get('controller');
     // set up view
-    $viewClass = $this->superGet('viewClass');
+    $viewClass = $this->get('viewClass');
     $view = new $viewClass($controller);
     // check if view file exists
     $this->set('view', $view);

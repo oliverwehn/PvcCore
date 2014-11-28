@@ -17,7 +17,7 @@
  */
 namespace Pwvc;
 
-class PwvcController extends PwvcObject {
+class PwvcController extends \WireData {
 
   const DEFAULT_ACTION = 'index';
 
@@ -28,8 +28,8 @@ class PwvcController extends PwvcObject {
   /**
    * Initialization and setup
    */
-  public function __construct(PwvcModel $model) {
-    $this->set('_model', $model);
+  public function __construct(\Page $model) {
+    $this->set('model', $model);
     $this->set('assets', new \WireArray);
     $this->init();
   }
@@ -40,51 +40,72 @@ class PwvcController extends PwvcObject {
 
   public function get($key) {
     switch($key) {
-      case 'options': {
-        $result = $this->getOptions();
+      case 'model': {
+        return $this->_model;
         break;
       }
       default: {
-        $result = $this->_model->get($key);
+        if(strpos($key, '.') !== FALSE) {
+          $keySegments = explode('.', $key);
+          $keySegmentsCount = count($keySegments);
+          $i = 0;
+          $element = $this;
+          do {
+            $element = $element->get($keySegments[$i]);
+            if($i < $keySegmentsCount - 1 && !method_exists($result, 'get')) {
+              throw new \WireException(sprintf($this->_('"%s" has no method "get" to get key "%s".'), implode('.', $keySegmentsPath), $keySegmentsPath[$i+1]));
+            }
+            $i++;
+          }
+          while($i < $keySegmentsCount);
+          return $element;
+        }
+        else {
+          return parent::get($key);
+        }
       }
     }
-    return $result ? $result : parent::get($key);
   }
 
   public function set($key, $value) {
     switch($key) {
       case 'options': {
-        $result = $this->setOptions($value);
+        return $this->setOptions($value);
+        break;
+      }
+      case 'model': {
+        $this->_model = $value;
+        return $this;
         break;
       }
       default: {
-        $model = &$this->_model;
-        if($model && $model->get($key) !== NULL) {
-          return $model->set($key, $value);
+        if(strpos($key, '.') !== FALSE) {
+          $keySegments = explode('.', $key);
+          $keySegmentsCount = count($keySegments);
+          $keySegmentsPath = array();
+          $i = 0;
+          $element = $this;
+          do {
+            $element = $element->get($keySegments[$i]);
+            $keySegmentsPath[] = $keySegments[$i];
+            if(!method_exists($element, 'get')) {
+              throw new \WireException(sprintf($this->_('"%s" has no method "get" to get key "%s".'), implode('.', $keySegmentsPath), $keySegmentsPath[$i+1]));
+            }
+            $i++;
+          }
+          while($i < $keySegmentsCount - 1);
+          return $element->set($keySegments[$i], $value);
         }
-        return parent::set($key, $value);
+        else {
+          return parent::set($key, $value);
+        }
       }
     }
   }
 
-  public function getModel() {
-    return $this->_model;
-  }
-
-  public function setModel(PwvcModel $model) {
-    $this->_model = $model;
-    return $this;
-  }
-
-  public function getOptions() {
-    return $this->superGet('options');
-  }
-
   public function setOptions(Array $options) {
     $currOptions = $this->get('options');
-    if(!$currOptions) {
-      // $model = $this->get('model');
-      // if(!($currOptions = $model->get('options')) || (!is_array($currOptions))) $currOptions = array();
+    if(!is_array($currOptions)) {
       $currOptions = array();
     }
     if(array_key_exists('pageStack', $options) && count($options['pageStack']) == 0) {
@@ -99,36 +120,29 @@ class PwvcController extends PwvcObject {
       }
     }
     $options = array_merge($currOptions, $options);
-    $this->superSet('options', $options);
-    return $this;
+    return parent::set('options', $options);
   }
-
-//   public function generateCallTrace()
-// {
-//     $e = new \Exception();
-//     $trace = explode("\n", $e->getTraceAsString());
-//     // reverse array to make steps line up chronologically
-//     $trace = array_reverse($trace);
-//     array_shift($trace); // remove {main}
-//     array_pop($trace); // remove call to this method
-//     $length = count($trace);
-//     $result = array();
-
-//     for ($i = 0; $i < $length; $i++)
-//     {
-//         $result[] = ($i + 1)  . ')' . substr($trace[$i], strpos($trace[$i], ' ')); // replace '#someNum' with '$i)', set the right ordering
-//     }
-
-//     return "\t" . implode("\n\t", $result)."<hr />";
-// }
 
   public function action($call=NULL) {
     if(!$call) $call = $this->calledAction();
     if(!is_array($call)) $call = array('action' => $call, 'input' => array());
-    if(!$this->validateAction($call['action'])) throw new \WireException(sprintf($this->_('Called invalid action "%s" on controller "%s".'), $call['action'], get_class($this)));
     if(count($call['input']))
       $this->input->route = new \WireInputData($call['input']);
-    return $this->$call['action']();
+    if($this->call($call['action'])) {
+      $result = array();
+      if($model = $this->get('model')) {
+        $modelScope = $model->getArray();
+        foreach($modelScope as $k => $v) {
+          $result[$k] = $v;
+        }
+      }
+      $controllerScope = $this->getArray();
+      foreach($controllerScope as $k => $v) {
+        $result[$k] = $v;
+      }
+      return $result;
+    }
+    return false;
   }
 
   public function validateAction($action) {
@@ -141,11 +155,16 @@ class PwvcController extends PwvcObject {
     }
   }
 
+  public function call($action) {
+    if(!$this->validateAction($action)) throw new \WireException(sprintf($this->_('Called invalid action "%s" on controller "%s".'), $action, get_class($this)));
+    call_user_func(array(&$this, $action));
+    return true;
+  }
 
   public function route($path, array $match, $method) {
     // alias could be '/:id/edit/'
     // should match '/17/edit/'
-    // route to action 'action-edit' with input id=>17 available
+    // route to action 'actionEdit' with input id=>17 available
     if(!preg_match("#^/(([a-z0-9\-_:]+(/|$))+)$#i", $path, $pathMatch))
       throw new \WireException(sprintf($this->_("Path '%s' is not valid for route alias."), $path));
     if(!method_exists($this, $method))
