@@ -239,7 +239,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   // Get file extension
   public static function ext($type, $renderer=null) {
     $rendererClass = wire('pwvc')->renderer;
-    $type = trim($type, 's') . 's';
+    $type = rtrim($type, 's') . 's';
     if(!$rendererClass) $rendererClass = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
     $exts = array(
       'models' => '.model.php',
