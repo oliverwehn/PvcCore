@@ -70,16 +70,14 @@ class PwvcController extends WireData {
     }
   }
 
-  public function action($call=NULL) {
-    if(!$call) $call = $this->calledAction();
-    if(!is_array($call)) $call = array('action' => $call, 'input' => array());
-    if(count($call['input']))
-      $this->input->route = new WireInputData($call['input']);
-    if($this->call($call['action'])) {
-      $result = array();
-      if($model = $this->get('model')) {
-        $modelScope = $model->getArray();
-        foreach($modelScope as $k => $v) {
+  public function execute($action, $input=array()) {
+    if(count($input))
+      $this->input->route = new WireInputData($input);
+    if($this->call($action)) {
+      $result = array('action' => $action);
+      if($page = $this->get('page')) {
+        $pageScope = $page->getArray();
+        foreach($pageScope as $k => $v) {
           $result[$k] = $v;
         }
       }
@@ -93,7 +91,7 @@ class PwvcController extends WireData {
   }
 
   public function validateAction($action) {
-    if(!is_string($action)) return FALSE;
+    if(!(is_string($action)) || !(method_exists($this, $action))) return FALSE;
     $reflMeth = new ReflectionMethod($this, $action);
     if($reflMeth->isPublic()) {
       return TRUE;
@@ -140,24 +138,29 @@ class PwvcController extends WireData {
   }
 
   public function calledAction() {
-    if($result = $this->get('calledAction')) return $result;
+    if($action = $this->get('calledAction')) return $action;
     if(!($options = $this->get('options'))) $options = array('route' => '/');
-    $result = array('action' => self::DEFAULT_ACTION, 'input' => array());
+    $actionName = self::DEFAULT_ACTION;
+    $actionInput = array();
     if(array_key_exists('action', $options)) {
-      $result['action'] = $options['action'];
+      $actionName = $options['action'];
     }
     elseif(array_key_exists('route', $options)) {
       $route = $options['route'];
       if($resolved = $this->routeToAction($route)) {
-        $result['action'] = $resolved['action'];
-        $result['input'] = $resolved['input'];
+        $actionName = $resolved['action'];
+        $actionInput = $resolved['input'];
       }
       else {
         throw new \WireException(sprintf($this->_('Route "%s" isn’t valid for Page "%s".'), $route, $this->get('page')->path));
       }
     }
-    $this->set('calledAction', $result);
-    return $result;
+    $self = $this;
+    $action = function() use($self, $actionName, $actionInput) {
+      return call_user_func(array(&$self, 'execute'), $actionName, $actionInput);
+    };
+    $this->set('calledAction', $action);
+    return $action;
   }
 
   public function routeToAction($route="/") {
@@ -231,133 +234,7 @@ class PwvcController extends WireData {
 
   }
 
-  /*
-  public function set($var, $val, $context = 'root') {
-    if(!array_key_exists($context, $this->scope)) $this->scope[strval($context)] = array();
-    if(($context == 'root') && (property_exists($this, $var))) parent::set($var, $val);
-    else $this->scope[$context][$var] = $val;
-  }
-
-  public function get($var, $context = 'root') {
-    if(!array_key_exists($context, $this->scope)) return FALSE;
-    if(($context == 'root') && (property_exists($this, $var))) return parent::get($var);
-    else if(array_key_exists($var, $this->scope[$context])) return $this->scope[$context][$var];
-    else return FALSE;
-  }
-
-  public function build_scope($context = 'root', $only=FALSE) {
-    if(!array_key_exists($context, $this->scope)) return array();
-    // start with fuel scrope
-    if(!$only) {
-      $scope = array_merge($this->scope['fuel'], $this->scope['root']);
-    } else {
-      $scope = array();
-    }
-    // add context scope
-    if($only || ($context != 'fuel' && $context != 'root'))
-      $scope = array_merge($scope, $this->scope[$context]);
-    // controller vars
-
-    return $scope;
-  }
-  */
-
-  public function build_scope($options = NULL) {
-    $scope = array('options' => $options);
-    foreach($this->fuel as $k=>&$v) {
-      $scope[$k] = $v;
-      unset($v);
-    }
-    foreach($this->data as $k=>&$v) {
-      $scope[$k] = $v;
-      unset($v);
-    }
-    $controller_vars = get_object_vars($this);
-    $sort = array('scripts', 'styles');
-    foreach($controller_vars as $k=>&$v) {
-      if(in_array($k, $sort)) {
-        foreach($v as $group=>$entries) {
-          usort($entries, array($this, '_sort_by_priority'));
-          $temp_v = array();
-          foreach($entries as $entry)
-            $temp_v[] = $entry[0];
-          $scope[$k][$group] = $temp_v;
-        }
-      } else {
-        $scope[$k] = $v;
-      }
-      unset($v);
-    }
-    return $scope;
-  }
-
-  public function add_style($style_path, $priority=0, $group_name=NULL) {
-    if(!is_string($style_path)) return FALSE;
-    $priority = intval($priority);
-    $group_name = $group_name?strval($group_name):'styles_' . count($this->styles);
-    if(!array_key_exists($group_name, $this->styles)) $this->styles[$group_name] = array();
-    $return = array($style_path, $priority, $group_name);
-    $styles =& $this->styles[$group_name];
-    foreach($styles as &$style) {
-      if($style[0] == $style_path) {
-        $style_path[1] = $priority;
-        return $return;
-      }
-    }
-    $styles[] = array($style_path, $priority);
-    return $return;
-  }
-
-  public function get_styles($group_name=NULL) {
-    $styles = array();
-    if((is_string($group_name)) && (array_key_exists($group_name, $this->styles))) {
-      $group = array_merge(array(), $this->styles[$group_name]);
-      usort($group, array($this, '_sort_by_priority'));
-      foreach($group as $style) $styles[] = $style[0];
-    }
-    else {
-      foreach($this->styles as $group_name => $group) {
-        $styles = array_merge($styles, $this->get_styles($group_name));
-      }
-    }
-    return $styles;
-  }
-
-  public function add_script($script_path, $priority=0, $group_name=NULL) {
-    if(!is_string($script_path)) return FALSE;
-    $priority = intval($priority);
-    $group_name = $group_name?strval($group_name):'scripts_' . count($this->scripts);
-    if(!array_key_exists($group_name, $this->scripts)) $this->scripts[$group_name] = array();
-    $return = array($script_path, $priority, $group_name);
-    $scripts =& $this->scripts[$group_name];
-    foreach($scripts as &$script) {
-      if($script[0] == $script_path) {
-        $script_path[1] = $priority;
-        return $return;
-      }
-    }
-    $scripts[] = array($script_path, $priority);
-    return $return;
-  }
-
-  public function get_scripts($group_name=NULL) {
-    $scripts = array();
-    if((is_string($group_name)) && (array_key_exists($group_name, $this->scripts))) {
-      $group = array_merge(array(), $this->scripts[$group_name]);
-      usort($group, array($this, '_sort_by_priority'));
-      foreach($group as $style) $scripts[] = $style[0];
-    }
-    else {
-      $scripts = array();
-      foreach($this->scripts as $group) {
-        usort($group, array($this, '_sort_by_priority'));
-        foreach($group as $script) $scripts[] = $script[0];
-      }
-    }
-    return $scripts;
-  }
-
-  protected function _sort_by_priority($a, $b) {
+  protected function _sortByPriority($a, $b) {
     if($a[1] == $b[1]) return 0;
     return $a[1] < $b[1]?-1:1;
   }

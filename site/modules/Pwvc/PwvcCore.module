@@ -279,7 +279,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
 
   // Sanitize filename
   public static function sanitizeFilename($className) {
-    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#^Pwvc\\\#", '',$className), $matches)) {
+    if(preg_match_all("#([A-Z][^A-Z$]+)#", $className, $matches)) {
       array_pop($matches[1]);
       $filename = strtolower(implode('_', $matches[1]));
     } else {

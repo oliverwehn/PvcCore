@@ -22,7 +22,7 @@ class PwvcLayout extends PwvcView {
       return FALSE;
     }
   }
-  public function ___loadViewFile() { return $this->loadLayoutFile(); }
+  public function ___loadViewFile($action=null) { return $this->loadLayoutFile(); }
 
 
   public function ___getLayoutFilename($layout_name=NULL) {
