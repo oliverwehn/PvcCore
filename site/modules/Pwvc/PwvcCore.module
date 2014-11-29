@@ -114,15 +114,12 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $oEvent = $event->arguments(0);
     $module = $event->object;
     $page = $oEvent->object;
+    if($page->template == 'admin') return;
     $options = $oEvent->arguments(0);
     if(is_string($options)) $options = $oEvent->arguments(1);
     if(!is_array($options)) $options = array();
     $this->_getActionRoute($options);
-    // $oEvent->replace = true;
-    if($page->template == 'admin') return;
-    // $page->addHook('output', $this, 'output');
     $oEvent->object = new PwvcPageProxy($page);
-    // $module->___renderPage($oEvent);
     $event = $oEvent;
   }
 
@@ -242,6 +239,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   // Get file extension
   public static function ext($type, $renderer=null) {
     $rendererClass = wire('pwvc')->renderer;
+    $type = trim($type, 's') . 's';
     if(!$rendererClass) $rendererClass = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
     $exts = array(
       'models' => '.model.php',
@@ -251,8 +249,8 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
       'templates' => '.tmpl.php',
       'snippets' => '.snippet.php'
     );
-    return $exts[$type . 's'];
-    return $rendererClass::ext($type);
+    return $exts[$type];
+    // return $rendererClass::ext($type);
   }
 
   // Sanitize controller name
@@ -332,15 +330,13 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   // Get class name for object with or without namespace
-  public static function getClass($controller, $ns=true) {
-    $class = get_class($controller);
-    return $ns ? $class : substr($class, strpos($class, "\\")+1);
+  public static function getClass($controller) {
+    return get_class($controller);
   }
 
   // Get array of controller method names
   private function _getControllerMethods($class) {
     $methods = array();
-    $classNs = self::NS . "\\" . $class;
     if(!class_exists($classNs)) {
       $controllerFile = $this->getControllerFilename($class);
       $ControllerPath = $this->paths->controllers . $controllerFile . self::ext('controllers');
@@ -349,16 +345,15 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
       }
     }
     do {
-      $reflection = new ReflectionClass($classNs);
+      $reflection = new ReflectionClass($class);
       foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
         if ($method->class == $reflection->getName()) {
           $methods[] = $method->name;
         }
       }
-      $classNs = get_parent_class($classNs);
-      $class = ltrim($classNs, self::NS . "\\");
+      $class = get_parent_class($class);
       $namespace = $reflection->getNamespaceName();
-    } while(($namespace == self::NS) && ($class != 'AppController' && $class != 'Controller'));
+    } while($class !== 'AppController' && $class !== 'PwvcController');
     return $methods;
   }
 
@@ -419,14 +414,14 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $field = new InputfieldText();
     $field->label = "Layouts path";
     $field->attr('name+id', 'cfgLayoutsPath');
-    if(isset($data['cfgLayoutsPath']) ? $field->value = self::cleanPath($data['cfgLayoutsPath']) : $field->value = self::$defaults['cfgLayoutsPath']);
+    if(isset($data['cfgLayoutsPath']) ? $field->value = self::cleanPath($data['cfgLayoutsPath']) : $field->value = self::$defaults['layoutsPath']);
     $wrapper->append($field);
 
     // field for app controller path
     $field = new InputfieldText();
     $field->label = 'App Controller folder, where is the App Controller located';
     $field->attr('name+id', 'cfgAppControllerPath');
-    if(isset($data['cfgAppControllerPath']) ? $field->value = self::cleanPath($data['cfgAppControllerPath']) : $field->value = self::$defaults['cfgAppControllerPath']);
+    if(isset($data['cfgAppControllerPath']) ? $field->value = self::cleanPath($data['cfgAppControllerPath']) : $field->value = self::$defaults['appControllerPath']);
     $wrapper->append($field);
     $form->append($wrapper);
 
@@ -434,21 +429,21 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $field = new InputfieldText();
     $field->label = "Controllers path";
     $field->attr('name+id', 'cfgControllersPath');
-    if(isset($data['cfgControllersPath']) ? $field->value = self::cleanPath($data['cfgControllersPath']) : $field->value = self::$defaults['cfgControllersPath']);
+    if(isset($data['cfgControllersPath']) ? $field->value = self::cleanPath($data['cfgControllersPath']) : $field->value = self::$defaults['controllersPath']);
     $wrapper->append($field);
 
     // field for snippets path
     $field = new InputfieldText();
     $field->label = "Snippets path";
     $field->attr('name+id', 'cfgSnippetsPath');
-    if(isset($data['cfgSnippetsPath']) ? $field->value = self::cleanPath($data['cfgSnippetsPath']) : $field->value = self::$defaults['cfgSnippetsPath']);
+    if(isset($data['cfgSnippetsPath']) ? $field->value = self::cleanPath($data['cfgSnippetsPath']) : $field->value = self::$defaults['snippetsPath']);
     $wrapper->append($field);
 
     // field for views path
     $field = new InputfieldText();
     $field->label = "Views path";
     $field->attr('name+id', 'cfgViewsPath');
-    if(isset($data['cfgViewsPath']) ? $field->value = self::cleanPath($data['cfgViewsPath']) : $field->value = self::$defaults['cfgViewsPath']);
+    if(isset($data['cfgViewsPath']) ? $field->value = self::cleanPath($data['cfgViewsPath']) : $field->value = self::$defaults['viewsPath']);
     $wrapper->append($field);
     $form->append($wrapper);
 
@@ -456,7 +451,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $field = new InputfieldText();
     $field->label = "Assets path";
     $field->attr('name+id', 'cfgAssetsPath');
-    if(isset($data['cfgAssetsPath']) ? $field->value = self::cleanPath($data['cfgAssetsPath']) : $field->value = self::$defaults['cfgAssetsPath']);
+    if(isset($data['cfgAssetsPath']) ? $field->value = self::cleanPath($data['cfgAssetsPath']) : $field->value = self::$defaults['assetsPath']);
     $wrapper->append($field);
 
     $form->append($wrapper);
@@ -469,14 +464,14 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $field = new InputfieldText();
     $field->label = "Styles";
     $field->attr('name+id', 'cfgStylesMarkup');
-    if(isset($data['cfgStylesMarkup']) ? $field->value = $data['cfgStylesMarkup'] : $field->value = self::$defaults['cfgStylesMarkup']);
+    if(isset($data['cfgStylesMarkup']) ? $field->value = $data['cfgStylesMarkup'] : $field->value = self::$defaults['stylesMarkup']);
     $wrapper->append($field);
 
     // field for scripts markup
     $field = new InputfieldText();
     $field->label = "Scripts";
     $field->attr('name+id', 'cfgScriptsMarkup');
-    if(isset($data['cfgScriptsMarkup']) ? $field->value = $data['cfgScriptsMarkup'] : $field->value = self::$defaults['cfgScriptsMarkup']);
+    if(isset($data['cfgScriptsMarkup']) ? $field->value = $data['cfgScriptsMarkup'] : $field->value = self::$defaults['scriptsMarkup']);
     $wrapper->append($field);
 
     $form->append($wrapper);
