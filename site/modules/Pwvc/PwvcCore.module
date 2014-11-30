@@ -68,6 +68,8 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
 
     // manipulate render event
     // $this->addHookBefore('PageRender::renderPage', $this, 'renderView');
+    $this->addHookBefore('Page::viewable', $this, 'stubTemplate');
+    //$this->addHookProperty('Template::filenameExists', $this, 'stubTemplate');
     $this->addHookBefore('PageRender::renderPage', $this, 'renderView');
 
     // set up renderer
@@ -119,8 +121,20 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     if(is_string($options)) $options = $oEvent->arguments(1);
     if(!is_array($options)) $options = array();
     $this->_getActionRoute($options);
-    $oEvent->object = new PwvcPageProxy($page);
+    if(($proxy = $this->get('proxy')) && ($proxy->id == $page->id)) {
+      $oEvent->object = $proxy;
+    }
+    else { echo $page->name;
+      $oEvent->object = new PwvcPageProxy($page);
+    }
     $event = $oEvent;
+  }
+
+  public function stubTemplate($event)   {
+    $page = $event->object;
+    $proxy = new PwvcPageProxy($page);
+    $this->set('proxy', $proxy);
+    $event->return = true;
   }
 
   /**

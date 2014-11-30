@@ -5,7 +5,16 @@ class PwvcPageProxy extends WireData {
   protected $_page = null;
 
   public function __construct(Page $page) {
-    $this->_page = $page;
+    $this->_page = &$page;
+    $view = $this->_setupView();
+    // get action and store view file name as altFilename with page’s template
+    // (just to make viewable check pass)
+    $controller = $view->get('controller');
+    $action = $controller->calledAction(true);
+    $filename = $view->getViewFilename($action);
+    $page->template->set('filename', $filename);
+    $page->template->set('altFilename', '');
+
     return $this->_page->id;
   }
 
@@ -17,35 +26,44 @@ class PwvcPageProxy extends WireData {
    * @return PwvcView (extends TemplateFile)
    */
   public function output($forceNew=true) {
-    $page = $this->_page;
-    $templateName = $page->template->name;
-    $view = $page->get('output');
+    $view = $this->get('output');
     // use existing view, when existing and !$forceNew
     if(!($view instanceof PwvcView && !$forceNew)) {
-      $saveDir = getcwd();
-      chdir(dirname(getenv('SCRIPT_FILENAME')));
-      // else create a new view
-      $controllerClass = PwvcCore::getClassName($templateName, 'controller');
-      $controllerFilename = PwvcCore::getConfigValue('cfgControllersPath') . PwvcCore::getFilename('controller', $controllerClass);
-      if(file_exists($controllerFilename)) require_once($controllerFilename);
-      $viewClass = PwvcCore::getClassName($templateName, 'view');
-      $viewFilename = PwvcCore::getConfigValue('cfgViewsPath') . PwvcCore::getFilename('view', $viewClass);
-      if(file_exists($viewFilename)) require_once($viewFilename);
-
-      if(!((class_exists($controllerClass)) || (PwvcController::extend($controllerClass)))) {
-        throw new WireException(sprintf($this->_('Wasn’t able to set up controller "%s".'), $controllerClass));
-      }
-      $controller = new $controllerClass($this);
-      if(!((class_exists($viewClass)) || (PwvcView::extend($viewClass)))) {
-        throw new WireException(sprintf($this->_('Wasn’t able to set up view "%s".'), $viewClass));
-      }
-      $view = new $viewClass($controller);
-      // check if view file exists
-      $page->set('output', $view);
-      chdir($saveDir);
+      $view = $this->_setupView();
     }
     return $view;
   }
+
+  private function _setupView() {
+    $page = $this->_page;
+    $templateName = $page->template->name;
+    // save working dir
+    $saveDir = getcwd();
+    chdir(dirname(getenv('SCRIPT_FILENAME')));
+    // get controller class
+    $controllerClass = PwvcCore::getClassName($templateName, 'controller');
+    $controllerFilename = PwvcCore::getConfigValue('cfgControllersPath') . PwvcCore::getFilename('controller', $controllerClass);
+    if(file_exists($controllerFilename)) require_once($controllerFilename);
+    if(!((class_exists($controllerClass)) || (PwvcController::extend($controllerClass)))) {
+      throw new WireException(sprintf($this->_('Wasn’t able to set up controller "%s".'), $controllerClass));
+    }
+    $controller = new $controllerClass($this);
+    // get view class
+    $viewClass = PwvcCore::getClassName($templateName, 'view');
+    $viewFilename = PwvcCore::getConfigValue('cfgViewsPath') . PwvcCore::getFilename('view', $viewClass);
+    if(file_exists($viewFilename)) require_once($viewFilename);
+    if(!((class_exists($viewClass)) || (PwvcView::extend($viewClass)))) {
+      throw new WireException(sprintf($this->_('Wasn’t able to set up view "%s".'), $viewClass));
+    }
+    $view = new $viewClass($controller);
+    // store view instead of template file with page
+    $page->set('output', $view);
+    // restore working dir
+    chdir($saveDir);
+    // return view
+    return $view;
+  }
+
 
   public function __get($key) {
     return $this->_page->get($key);

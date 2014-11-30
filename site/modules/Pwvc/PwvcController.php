@@ -137,8 +137,8 @@ class PwvcController extends WireData {
     return $route;
   }
 
-  public function calledAction() {
-    if($action = $this->get('calledAction')) return $action;
+  public function calledAction($justName=false) {
+    if((!$justName) && ($action = $this->get('calledAction'))) return $action;
     if(!($options = $this->get('options'))) $options = array('route' => '/');
     $actionName = self::DEFAULT_ACTION;
     $actionInput = array();
@@ -155,11 +155,16 @@ class PwvcController extends WireData {
         throw new \WireException(sprintf($this->_('Route "%s" isn’t valid for Page "%s".'), $route, $this->get('page')->path));
       }
     }
-    $self = $this;
-    $action = function() use($self, $actionName, $actionInput) {
-      return call_user_func(array(&$self, 'execute'), $actionName, $actionInput);
-    };
-    $this->set('calledAction', $action);
+    if(!$justName) {
+      $self = $this;
+      $action = function() use($self, $actionName, $actionInput) {
+        return call_user_func(array(&$self, 'execute'), $actionName, $actionInput);
+      };
+      $this->set('calledAction', $action);
+    }
+    else {
+      $action = $actionName;
+    }
     return $action;
   }
 
