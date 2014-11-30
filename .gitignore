@@ -8,3 +8,5 @@ site/modules/*
 !site/modules/Pvc
 !site/modules/Pvc/*
 !site/modules/Pvc/**/*
+site/modules/Pvc/Twig
+site/modules/Pvc/PvcRendererTwig.module

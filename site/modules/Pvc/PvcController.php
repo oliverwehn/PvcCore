@@ -30,12 +30,11 @@ class PvcController extends WireData {
   public function __construct(PvcPageProxy $page) {
     $this->set('page', $page);
     $this->set('assets', new WireArray);
+    $this->set('layout', PvcCore::DEFAULT_LAYOUT);
     $this->init();
   }
 
-  public function init() {
-    $this->set('layout', PvcCore::DEFAULT_LAYOUT);
-  }
+  public function init() { }
 
   public function get($key) {
     switch($key) {

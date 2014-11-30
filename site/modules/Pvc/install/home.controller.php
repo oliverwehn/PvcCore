@@ -6,6 +6,10 @@ class HomeController extends AppController {
    * For general controller setup use init() method
    *
   public init() {
+    // If you have setup stuff done in AppController’s init() method,
+    // don’t forget to call it!
+    parent::init();
+
     // Set a different layout for this page
     // Layout must exist in 'site/templates/layouts/'
     $this->set('layout', 'shop');
