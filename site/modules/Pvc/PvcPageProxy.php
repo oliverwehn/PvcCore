@@ -1,6 +1,6 @@
 <?php
 
-class PwvcPageProxy extends WireData {
+class PvcPageProxy extends WireData {
 
   protected $_page = null;
 
@@ -23,12 +23,12 @@ class PwvcPageProxy extends WireData {
    * Render page output, replaces $page->output()
    * @method output
    * @param bool $forceNew Forces it to return a new (non-cached) TemplateFile object (default=false)
-   * @return PwvcView (extends TemplateFile)
+   * @return PvcView (extends TemplateFile)
    */
   public function output($forceNew=true) {
     $view = $this->get('output');
     // use existing view, when existing and !$forceNew
-    if(!($view instanceof PwvcView && !$forceNew)) {
+    if(!($view instanceof PvcView && !$forceNew)) {
       $view = $this->_setupView();
     }
     return $view;
@@ -41,18 +41,18 @@ class PwvcPageProxy extends WireData {
     $saveDir = getcwd();
     chdir(dirname(getenv('SCRIPT_FILENAME')));
     // get controller class
-    $controllerClass = PwvcCore::getClassName($templateName, 'controller');
-    $controllerFilename = PwvcCore::getConfigValue('cfgControllersPath') . PwvcCore::getFilename('controller', $controllerClass);
+    $controllerClass = PvcCore::getClassName($templateName, 'controller');
+    $controllerFilename = PvcCore::getConfigValue('cfgControllersPath') . PvcCore::getFilename('controller', $controllerClass);
     if(file_exists($controllerFilename)) require_once($controllerFilename);
-    if(!((class_exists($controllerClass)) || (PwvcController::extend($controllerClass)))) {
+    if(!((class_exists($controllerClass)) || (PvcController::extend($controllerClass)))) {
       throw new WireException(sprintf($this->_('Wasn’t able to set up controller "%s".'), $controllerClass));
     }
     $controller = new $controllerClass($this);
     // get view class
-    $viewClass = PwvcCore::getClassName($templateName, 'view');
-    $viewFilename = PwvcCore::getConfigValue('cfgViewsPath') . PwvcCore::getFilename('view', $viewClass);
+    $viewClass = PvcCore::getClassName($templateName, 'view');
+    $viewFilename = PvcCore::getConfigValue('cfgViewsPath') . PvcCore::getFilename('view', $viewClass);
     if(file_exists($viewFilename)) require_once($viewFilename);
-    if(!((class_exists($viewClass)) || (PwvcView::extend($viewClass)))) {
+    if(!((class_exists($viewClass)) || (PvcView::extend($viewClass)))) {
       throw new WireException(sprintf($this->_('Wasn’t able to set up view "%s".'), $viewClass));
     }
     $view = new $viewClass($controller);

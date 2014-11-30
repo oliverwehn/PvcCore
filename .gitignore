@@ -5,6 +5,6 @@
 site/*
 !site/modules
 site/modules/*
-!site/modules/Pwvc
-!site/modules/Pwvc/*
-!site/modules/Pwvc/**/*
+!site/modules/Pvc
+!site/modules/Pvc/*
+!site/modules/Pvc/**/*

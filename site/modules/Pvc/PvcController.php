@@ -1,7 +1,7 @@
 <?php
 /**
- * Pwvc Controller Class V. 0.9.0
- * Part of Pwvc, a module for ProcessWire 2.3+
+ * Pvc Controller Class V. 0.9.0
+ * Part of Pvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -16,7 +16,7 @@
  *
  */
 
-class PwvcController extends WireData {
+class PvcController extends WireData {
 
   const DEFAULT_ACTION = 'index';
 
@@ -27,14 +27,14 @@ class PwvcController extends WireData {
   /**
    * Initialization and setup
    */
-  public function __construct(PwvcPageProxy $page) {
+  public function __construct(PvcPageProxy $page) {
     $this->set('page', $page);
     $this->set('assets', new WireArray);
     $this->init();
   }
 
   public function init() {
-    $this->set('layout', PwvcCore::DEFAULT_LAYOUT);
+    $this->set('layout', PvcCore::DEFAULT_LAYOUT);
   }
 
   public function get($key) {
@@ -44,7 +44,7 @@ class PwvcController extends WireData {
         break;
       }
       default: {
-        $method = 'get' . PwvcCore::camelcase($key);
+        $method = 'get' . PvcCore::camelcase($key);
         if(method_exists($this, $method)) {
           return $this->$method();
         }
@@ -61,7 +61,7 @@ class PwvcController extends WireData {
         break;
       }
       default: {
-        $method = 'set' . PwvcCore::camelcase($key);
+        $method = 'set' . PvcCore::camelcase($key);
         if(method_exists($this, $method)) {
           return $this->$method($value);
         }
@@ -221,7 +221,7 @@ class PwvcController extends WireData {
     if(!$assetsForType->has($group)) $assetsForType->set($group, new \WireArray);
     $assetsGroup = $assetsForType->get($group);
     $newAsset = new \WireData;
-    $newAssetPath = preg_match("#^(http:)?//#i", $name) ? $name : $this->pwvc->urls->$type . $name;
+    $newAssetPath = preg_match("#^(http:)?//#i", $name) ? $name : $this->pvc->urls->$type . $name;
     $newAsset->set('path', $newAssetPath)->set('priority', $prio);
     $assetsGroup->set($name, $newAsset);
     return $assetsGroup->count;
@@ -246,13 +246,13 @@ class PwvcController extends WireData {
 
 
   protected function _ext($type, $subtype=NULL) {
-    return ProcessPwvc::ext($type, $this->pwvc->template_engine);
+    return ProcessPvc::ext($type, $this->pvc->template_engine);
   }
 
   public static function extend($className) {
     $classCode = '
     class '. $className . ' extends ' . get_called_class() . ' {
-      public function __constructor(PwvcPageProxy $page) {
+      public function __constructor(PvcPageProxy $page) {
         parent::__constructor($page);
       }
     }

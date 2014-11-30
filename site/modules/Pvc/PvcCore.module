@@ -1,7 +1,7 @@
 <?php
 /**
- * Pwvc Core Module Class V. 0.1.0
- * Part of Pwvc, a module for ProcessWire 2.3+
+ * Pvc Core Module Class V. 0.1.0
+ * Part of Pvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -14,21 +14,19 @@
  * associated controllers and actions
  *
  */
-require_once('PwvcPageProxy.php');
-require_once('PwvcView.php');
-require_once('PwvcLayout.php');
-require_once('PwvcController.php');
-require_once('PwvcRenderer.php');
+require_once('PvcPageProxy.php');
+require_once('PvcView.php');
+require_once('PvcLayout.php');
+require_once('PvcController.php');
 
-class PwvcCore extends WireData implements Module, ConfigurableModule {
+class PvcCore extends WireData implements Module, ConfigurableModule {
 
-  const PERMISSION_NAME = 'pwvc-admin';
-  const MODULE_NAME = 'Pwvc';
-  const TEMPLATE_FILENAME = 'pwvc';
+  const PERMISSION_NAME = 'pvc-admin';
+  const MODULE_NAME = 'PvcCore';
+  const TEMPLATE_FILENAME = 'pvc';
   const DEFAULT_LAYOUT = 'default';
   const DEFAULT_RENDERER = 'Native';
   const APP_CONTROLLER = 'AppController.php';
-  const NS = 'Pwvc';
 
   private $_renderer = null;
 
@@ -47,14 +45,14 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
 
   public static function getModuleInfo(){
     return array(
-      'title' => 'Pwvc Core',
-      'summary' => __('Stands for ProcessWire-Module-View. A module that implements MVC’ish template processing.'),
+      'title' => 'Pvc Core',
+      'summary' => __('PVC stands for Page-View-Controller and brings MVCish templating to ProcessWire.'),
       'autoload' => true,
       'version' => 100,
       'author' => 'Oliver Wehn',
-      'href' => 'https://github.com/oliverwehn/Pwvc',
+      'href' => 'https://github.com/oliverwehn/Pvc',
       'singular' => true,
-      //'installs' => 'ProcessPwvc'
+      'installs' => ['PvcRendererNative']
     );
   }
 
@@ -63,8 +61,8 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   public function init() {
-    // set global pwvc var
-    Wire::setFuel('pwvc', $this);
+    // set global pvc var
+    Wire::setFuel('pvc', $this);
 
     // manipulate render event
     // $this->addHookBefore('PageRender::renderPage', $this, 'renderView');
@@ -81,27 +79,33 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $this->templatesRelPath = str_replace($this->config->paths->root, '', $this->config->paths->templates);
 
     // set up default paths from config
-    $pwvc_paths = new Paths($this->config->paths->get('root'));
-    $pwvc_urls = new Paths($this->config->urls->templates);
-    $pwvc_paths->set('appController', $this->_getDefaultPath('appController'));
-    $pwvc_paths->set('views',  $this->_getDefaultPath('views'));
-    $pwvc_paths->set('controllers', $this->_getDefaultPath('controllers'));
-    $pwvc_paths->set('layouts', $this->_getDefaultPath('layouts'));
-    $pwvc_paths->set('snippets', $this->_getDefaultPath('snippets'));
-    $pwvc_paths->set('assets', $this->_getDefaultPath('assets'));
-    $pwvc_urls->set('assets', $this->getRelPath($pwvc_paths->get('assets'), $this->config->urls->templates));
-    $pwvc_paths->set('styles', $this->validateDir($pwvc_paths->get('assets') . 'styles/'));
-    $pwvc_urls->set('styles', $this->getRelPath($pwvc_paths->get('styles'), $this->config->urls->templates));
-    $pwvc_paths->set('scripts', $this->validateDir($pwvc_paths->get('assets') . 'scripts/'));
-    $pwvc_urls->set('scripts', $this->getRelPath($pwvc_paths->get('scripts'), $this->config->urls->templates));
-    $pwvc_paths->set('images', $this->validateDir($pwvc_paths->get('assets') . 'images/'));
-    $pwvc_urls->set('images', $this->getRelPath($pwvc_paths->get('images'), $this->config->urls->templates));
-    $this->set('paths', $pwvc_paths);
-    $this->set('urls', $pwvc_urls);
+    $pvc_paths = new Paths($this->config->paths->get('root'));
+    $pvc_urls = new Paths($this->config->urls->templates);
+    $pvc_paths->set('appController', $this->_getDefaultPath('appController'));
+    $pvc_paths->set('views',  $this->_getDefaultPath('views'));
+    $pvc_paths->set('controllers', $this->_getDefaultPath('controllers'));
+    $pvc_paths->set('layouts', $this->_getDefaultPath('layouts'));
+    $pvc_paths->set('snippets', $this->_getDefaultPath('snippets'));
+    $pvc_paths->set('assets', $this->_getDefaultPath('assets'));
+    $pvc_urls->set('assets', $this->getRelPath($pvc_paths->get('assets'), $this->config->urls->templates));
+    $pvc_paths->set('styles', $this->validateDir($pvc_paths->get('assets') . 'styles/'));
+    $pvc_urls->set('styles', $this->getRelPath($pvc_paths->get('styles'), $this->config->urls->templates));
+    $pvc_paths->set('scripts', $this->validateDir($pvc_paths->get('assets') . 'scripts/'));
+    $pvc_urls->set('scripts', $this->getRelPath($pvc_paths->get('scripts'), $this->config->urls->templates));
+    $pvc_paths->set('images', $this->validateDir($pvc_paths->get('assets') . 'images/'));
+    $pvc_urls->set('images', $this->getRelPath($pvc_paths->get('images'), $this->config->urls->templates));
+    $this->set('paths', $pvc_paths);
+    $this->set('urls', $pvc_urls);
     if($this->paths->app_controller == "")
-      $appController= $this->config->paths->templates . self::APP_CONTROLLER;
+      $appController = $this->config->paths->templates . self::APP_CONTROLLER;
     else
-      $appController= $this->paths->appController. self::APP_CONTROLLER;
+      $appController = $this->paths->appController. self::APP_CONTROLLER;
+    if(!file_exists($appController)) {
+      $path = dirname(__FILE__) . '/' . install . '/' . self::APP_CONTROLLER;
+      if(file_exists($path)) {
+        copy($path, $appController);
+      }
+    }
     // include AppController class
     require_once($appController);
   }
@@ -125,14 +129,14 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
       $oEvent->object = $proxy;
     }
     else { echo $page->name;
-      $oEvent->object = new PwvcPageProxy($page);
+      $oEvent->object = new PvcPageProxy($page);
     }
     $event = $oEvent;
   }
 
   public function stubTemplate($event)   {
     $page = $event->object;
-    $proxy = new PwvcPageProxy($page);
+    $proxy = new PvcPageProxy($page);
     $this->set('proxy', $proxy);
     $event->return = true;
   }
@@ -160,7 +164,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
    */
   // set up renderer
   private function initRenderer($rendererName = NULL) {
-    $class = 'PwvcRenderer';
+    $class = 'PvcRenderer';
     if(!is_string($rendererName)) $rendererName = $this->cfgRendererName;
     $instanceOf = $class;
     $class .= $this->camelcase($rendererName);
@@ -252,9 +256,9 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
 
   // Get file extension
   public static function ext($type, $renderer=null) {
-    $rendererClass = wire('pwvc')->renderer;
+    $rendererClass = wire('pvc')->renderer;
     $type = rtrim($type, 's') . 's';
-    if(!$rendererClass) $rendererClass = 'PwvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
+    if(!$rendererClass) $rendererClass = 'PvcRenderer' . ucfirst(strtolower(self::DEFAULT_RENDERER));
     $exts = array(
       'models' => '.model.php',
       'controllers' => '.controller.php',
@@ -328,7 +332,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
 
   // Get filename from controller name
   public static function getControllerFilename($controllerName) {
-    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#Controller$#", '', preg_replace("#^Pwvc\\\#", '',$controllerName)), $matches)) {
+    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#Controller$#", '', preg_replace("#^Pvc\\\#", '',$controllerName)), $matches)) {
       $filename = strtolower(implode('_', $matches[1]));
       return $filename;
     } else {
@@ -337,9 +341,9 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   // Get controller class name with or without namespace
-  public static function getControllerClassName($name, $ns=true) {
-    if(is_object($name)) return $this->getClass($name, $ns);
-    $class_name = ($ns ? self::NS . "\\" : "") . self::sanitizeControllerName($name) . 'Controller';
+  public static function getControllerClassName($name) {
+    if(is_object($name)) return $this->getClass($name);
+    $class_name = self::sanitizeControllerName($name) . 'Controller';
     return $class_name;
   }
 
@@ -367,7 +371,7 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
       }
       $class = get_parent_class($class);
       $namespace = $reflection->getNamespaceName();
-    } while($class !== 'AppController' && $class !== 'PwvcController');
+    } while($class !== 'AppController' && $class !== 'PvcController');
     return $methods;
   }
 
@@ -382,10 +386,10 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
  * Configuration
  */
   static public function getModuleConfigInputfields(array $data) {
-    $pwvc = wire('pwvc');
+    $pvc = wire('pvc');
 
     $form = new InputfieldForm();
-    $form->attr('id', 'pwvc-config');
+    $form->attr('id', 'pvc-config');
     $wrapper = new InputfieldWrapper();
     $wrapper->label = __("General Configuration");
 
@@ -396,12 +400,12 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $templatesRelPath = str_replace($config->paths->root, '', $config->paths->templates);
 
     // field for name of default layout file
-    $fieldValue = isset($data['cfgDefaultLayout']) ? $data['cfgDefaultLayout'] : self::DEFAULT_LAYOUT_NAME;
+    $fieldValue = isset($data['cfgDefaultLayout']) ? $data['cfgDefaultLayout'] : self::DEFAULT_LAYOUT;
     $cfgDefaultLayout = $fieldValue . self::ext('layouts');
     $field = new InputfieldText();
     $field->label = 'Default layout file (php file in your layouts folder)';
     $field->attr('name+id', 'cfgDefaultLayout');
-    $field->description = file_exists(wire('config')->paths->root . $data['cfgLayoutsPath'] . $cfgDefaultLayout)?sprintf(__("Layout file '%s' was found."), $cfgDefaultLayout):sprintf(__("Please provide a layout file '%s' in your layout directory '%s'."), $cfgDefaultLayout, $data['cfgLayoutsPath']);
+    $field->description = file_exists(wire('config')->paths->root . $fieldValue . $cfgDefaultLayout)?sprintf(__("Layout file '%s' was found."), $cfgDefaultLayout):sprintf(__("Please provide a layout file '%s' in your layout directory '%s'."), $cfgDefaultLayout, $fieldValue);
     $field->value = $fieldValue;
     $wrapper->append($field);
 
@@ -409,13 +413,16 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $field = new InputfieldSelect();
     $field->label = 'Default Template Renderer';
     $field->attr('name+id', 'cfgRendererName');
-    $d = dir(dirname(__FILE__));
-    while($f = $d->read()) {
-      if(preg_match("#^PwvcRenderer(([A-Z][a-z]+)+)\.php$#", $f, $match)) {
+    $modules = wire('modules');
+    if(!array_key_exists('cfgRendererName', $data)) $data['cfgRendererName'] = self::DEFAULT_RENDERER;
+    // $renderers = $modules->find('class^=PvcRenderer');
+    foreach($modules as $module) {
+      if(preg_match('#^PvcRenderer([A-Z].+)$#', $module, $match)) {
         $name = $match[1];
-        $field->addOption($name, null, $data['cfgRendererName'] == $name?array('selected'=>'selected'):null);
+        $field->addOption($name, null, $data['cfgRendererName'] === $name ? array('selected'=>'selected'):null);
       }
     }
+    $field->removeOption('');
     $wrapper->append($field);
 
     $form->append($wrapper);
@@ -489,6 +496,20 @@ class PwvcCore extends WireData implements Module, ConfigurableModule {
     $wrapper->append($field);
 
     $form->append($wrapper);
+    // copy AppController
+    $modulePath = dirname(__FILE__) . '/install/';
+    $basePath = dirname(getenv('SCRIPT_FILENAME')) . '/';
+    $files = array(
+      'index.tmpl.php' => 'site/templates/views/home/',
+      'home.controller.php' => 'site/templates/controllers/'
+    );
+    foreach($files as $f => $dest) {
+      $dest = $basePath . $dest;
+      self::validateDir($dest);
+      $src = $modulePath . $f;
+      $dest = $dest . $f;
+      if(file_exists($src) && !file_exists($dest)) copy($src, $dest);
+    }
     return $form;
   }
 

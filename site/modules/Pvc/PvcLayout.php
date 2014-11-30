@@ -1,16 +1,16 @@
 <?php
 /**
- * Pwvc Layout Class V. 0.9.0
- * Part of Pwvc, a module for ProcessWire 2.5+
+ * Pvc Layout Class V. 0.9.0
+ * Part of Pvc, a module for ProcessWire 2.5+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
  *
- * View class extends PwvcView class.
+ * View class extends PvcView class.
  * Don’t modifiy.
  *
  */
-class PwvcLayout extends PwvcView {
+class PvcLayout extends PvcView {
 
   public function ___loadLayoutFile() {
     $filename = $this->getLayoutFilename();
@@ -26,9 +26,9 @@ class PwvcLayout extends PwvcView {
 
 
   public function ___getLayoutFilename($layout_name=NULL) {
-    $path = $this->pwvc->paths->layouts;
+    $path = $this->pvc->paths->layouts;
     if(!$layout_name) $layout_name = $this->_controller->get('layout');
-    $path .= $this->pwvc->getFilename('template', $layout_name);
+    $path .= $this->pvc->getFilename('template', $layout_name);
     return $path;
   }
   public function ___getViewFilename($template_name=null, $action = null) { return $this->getLayoutFilename($template_name=null); }
@@ -36,7 +36,7 @@ class PwvcLayout extends PwvcView {
   public function ___render($super=false) {
     if($super) return \TemplateFile::___render();
 
-    $renderer = $this->pwvc->getRenderer();
+    $renderer = $this->pvc->getRenderer();
     if(!($scope = $this->get('scope'))) {
       $scope = $this->buildScope();
     }

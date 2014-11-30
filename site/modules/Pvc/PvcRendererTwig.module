@@ -1,7 +1,7 @@
  <?php
 /**
- * Pwvc Twig Renderer Class V. 0.5.0
- * Part of Pwvc, a module for ProcessWire 2.3+
+ * Pvc Twig Renderer Class V. 0.5.0
+ * Part of Pvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -14,11 +14,12 @@
  *
  */
 
+require_once('PvcRenderer.php');
 require_once('Twig/Autoloader.php');
 
-class PwvcRendererTwig extends PwvcRenderer {
+class PvcRendererTwig extends PvcRenderer {
 
-  // Name of renderer, used to address it from Pwvc module
+  // Name of renderer, used to address it from Pvc module
   const RENDERER_NAME = 'Twig';
 
   protected static
@@ -32,6 +33,19 @@ class PwvcRendererTwig extends PwvcRenderer {
   private $cache_path = 'site/assets/cache/Twig/',
           $environments = array();
 
+  public static function getModuleInfo(){
+    return array(
+      'title' => 'Pvc Twig Renderer',
+      'summary' => __('PVC Renderer to use Twig syntax in your PVC templates.'),
+      'autoload' => true,
+      'version' => 100,
+      'author' => 'Oliver Wehn',
+      'href' => 'https://github.com/oliverwehn/Pvc',
+      'singular' => true,
+      'requires' => 'PvcCore'
+    );
+  }
+
   public function __construct() {
     parent::__construct();
 
@@ -44,13 +58,13 @@ class PwvcRendererTwig extends PwvcRenderer {
 
     // get Twig cache
     $this->cache_path = $this->config->paths->root . '/' . $this->cache_path;
-    if(!ProcessPwvc::validate_dir($this->cache_path)) {
+    if(!ProcessPvc::validate_dir($this->cache_path)) {
       throw new WireException(sprintf($this->__("Twig cache folder '%s' wasn’t found and cound’t be created."), $this->cache_path));
     }
   }
 
 
-  public function ___render() {
+  public function ___render(PvcView $view, Array $scope, $filename=NULL) {
     // template code goes here
     $templates = array();
 
@@ -94,9 +108,9 @@ class PwvcRendererTwig extends PwvcRenderer {
       'filesystem' => new Twig_Loader_Filesystem($this->config->paths->templates),
       'string' => new Twig_Loader_String
     );
-    $loaders['filesystem']->addPath($this->pwvc->paths->layouts, 'layouts');
-    $loaders['filesystem']->addPath($this->pwvc->paths->views, 'views');
-    $loaders['filesystem']->addPath($this->pwvc->paths->snippets, 'snippets');
+    $loaders['filesystem']->addPath($this->pvc->paths->layouts, 'layouts');
+    $loaders['filesystem']->addPath($this->pvc->paths->views, 'views');
+    $loaders['filesystem']->addPath($this->pvc->paths->snippets, 'snippets');
 
     $loader_chain = new Twig_Loader_Chain($loaders);
 

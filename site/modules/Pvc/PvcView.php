@@ -1,7 +1,7 @@
 <?php
 /**
- * Pwvc View Class V. 0.9.0
- * Part of Pwvc, a module for ProcessWire 2.5+
+ * Pvc View Class V. 0.9.0
+ * Part of Pvc, a module for ProcessWire 2.5+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
@@ -11,17 +11,17 @@
  *
  */
 
-class PwvcView extends TemplateFile {
+class PvcView extends TemplateFile {
 
   protected $_controller = null;
 
   /**
    * Construct the view from template name
    *
-   * @param PwvcController $controller template-specific controller object
+   * @param PvcController $controller template-specific controller object
    *
    */
-  public function __construct(PwvcController $controller) {
+  public function __construct(PvcController $controller) {
     $this->set('_controller', $controller);
     $fuel = self::getAllFuel();
     $this->set('wire', $fuel);
@@ -72,7 +72,7 @@ class PwvcView extends TemplateFile {
     $controller = $this->get('controller');
     $action = $controller->calledAction();
     if($super) return parent::___render();
-    $renderer = $this->pwvc->getRenderer();
+    $renderer = $this->pvc->getRenderer();
     if($actionScope = $action()) {
       $actionName = $actionScope['action'];
       if($this->loadViewFile($actionName)) {
@@ -118,7 +118,7 @@ class PwvcView extends TemplateFile {
         break;
       }
       default: {
-        $method = 'get' . PwvcCore::camelcase($key);
+        $method = 'get' . PvcCore::camelcase($key);
         if(method_exists($this, $method)) {
           return $this->$method();
         }
@@ -134,7 +134,7 @@ class PwvcView extends TemplateFile {
         break;
       }
       default: {
-        $method = 'set' . PwvcCore::camelcase($key);
+        $method = 'set' . PvcCore::camelcase($key);
         if(method_exists($this, $method)) {
           return $this->$method($value);
         }
@@ -151,7 +151,7 @@ class PwvcView extends TemplateFile {
     return $this->_controller;
   }
 
-  public function setController(PwvcController $controller) {
+  public function setController(PvcController $controller) {
     $this->_controller = $controller;
     return $this;
   }
@@ -186,18 +186,18 @@ class PwvcView extends TemplateFile {
 
   public function ___getViewFilename($action = null) {
     if(!$action && $filename = parent::get('filename')) return $filename;
-    $filename = $this->pwvc->paths->views;
-    $dir = PwvcCore::sanitizeFilename(get_class($this));
+    $filename = $this->pvc->paths->views;
+    $dir = PvcCore::sanitizeFilename(get_class($this));
     $filename .= $dir . '/';
-    $filename .= PwvcCore::getFilename('template', $action);
+    $filename .= PvcCore::getFilename('template', $action);
     return $filename;
   }
 
   protected function _initLayout($layoutName) {
-    $class = PwvcCore::getClassname($layoutName, 'layout');
+    $class = PvcCore::getClassname($layoutName, 'layout');
     if($class && !class_exists($class)) {
-      $classFile = PwvcCore::getFilename('layout', $class);
-      $classPath = $this->pwvc->paths->layouts . $classFile;
+      $classFile = PvcCore::getFilename('layout', $class);
+      $classPath = $this->pvc->paths->layouts . $classFile;
       // check if class file exists
       if(file_exists($classPath)) {
         // yes: include it
@@ -206,7 +206,7 @@ class PwvcView extends TemplateFile {
       // check again
       if(!class_exists($class)) {
         // fall back to creating class on demand
-        $base_class = PwvcCore::getClassname('Pwvc', 'layout');
+        $base_class = PvcCore::getClassname('Pvc', 'layout');
         $base_class::extend($class, '$controller');
       }
     }
@@ -223,9 +223,9 @@ class PwvcView extends TemplateFile {
   public function getViewHelpers($scope) {
     $helpers = array(
       'snippet' => function($name) use ($scope) {
-        $renderer = $this->pwvc->getRenderer();
-        $snippetPath = $this->pwvc->paths->snippets . strtolower($name) . $this->pwvc->ext('snippet');
-        if($renderer instanceof PwvcRenderer) {
+        $renderer = $this->pvc->getRenderer();
+        $snippetPath = $this->pvc->paths->snippets . strtolower($name) . $this->pvc->ext('snippet');
+        if($renderer instanceof PvcRenderer) {
           return $renderer->render($this, $scope, $snippetPath);
         }
         return sprintf($this->_('Snippet "%s" can’t be found.'), $snippetPath);
@@ -296,7 +296,7 @@ class PwvcView extends TemplateFile {
 
   public function _assets($assetsArr, $type, $group) {
     $type = rtrim($type, 's') . 's';
-    if(!($markup = $this->pwvc->getConfigValue(sprintf('cfg%sMarkup', $this->pwvc->camelcase($type))))) return false;
+    if(!($markup = $this->pvc->getConfigValue(sprintf('cfg%sMarkup', $this->pvc->camelcase($type))))) return false;
     $assets = $this->_extractAssets($assetsArr, $type, $group);
     $assetsMarkup = "";
     foreach($assets as $path) {
@@ -307,7 +307,7 @@ class PwvcView extends TemplateFile {
 
 
   public function _snippet($snippet_name) {
-    $snippet_file = $this->pwvc->paths->snippets . $snippet_name . $this->ext('snippets');
+    $snippet_file = $this->pvc->paths->snippets . $snippet_name . $this->ext('snippets');
     if(!file_exists($snippet_file)) return FALSE;
     if(method_exists($this, '_process_snippet')) return $this->_process_snippet($snippet_file);
     else return implode('', file($snippet_file));
@@ -368,7 +368,7 @@ class PwvcView extends TemplateFile {
   public static function extend($className) {
     $classCode = '
     class '. $className . ' extends ' . get_called_class() . ' {
-      public function __constructor(PwvcController $controller) {
+      public function __constructor(PvcController $controller) {
         parent::__constructor($controller);
       }
     }
