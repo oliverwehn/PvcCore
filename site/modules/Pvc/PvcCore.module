@@ -23,16 +23,14 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
 
   const PERMISSION_NAME = 'pvc-admin';
   const MODULE_NAME = 'PvcCore';
-  const TEMPLATE_FILENAME = 'pvc';
   const DEFAULT_LAYOUT = 'default';
   const DEFAULT_RENDERER = 'Native';
-  const APP_CONTROLLER = 'AppController.php';
 
   private $_renderer = null;
 
   private static
         $defaults = array(
-                    'appControllerPath' => 'site/templates/',
+                    'baseControllerPath' => 'site/templates/',
                     'layoutsPath' => 'site/templates/layouts/',
                     'controllersPath' => 'site/templates/controllers/',
                     'viewsPath' => 'site/templates/views/',
@@ -79,35 +77,36 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     $this->templatesRelPath = str_replace($this->config->paths->root, '', $this->config->paths->templates);
 
     // set up default paths from config
-    $pvc_paths = new Paths($this->config->paths->get('root'));
-    $pvc_urls = new Paths($this->config->urls->templates);
-    $pvc_paths->set('appController', $this->_getDefaultPath('appController'));
-    $pvc_paths->set('views',  $this->_getDefaultPath('views'));
-    $pvc_paths->set('controllers', $this->_getDefaultPath('controllers'));
-    $pvc_paths->set('layouts', $this->_getDefaultPath('layouts'));
-    $pvc_paths->set('snippets', $this->_getDefaultPath('snippets'));
-    $pvc_paths->set('assets', $this->_getDefaultPath('assets'));
-    $pvc_urls->set('assets', $this->getRelPath($pvc_paths->get('assets'), $this->config->urls->templates));
-    $pvc_paths->set('styles', $this->validateDir($pvc_paths->get('assets') . 'styles/'));
-    $pvc_urls->set('styles', $this->getRelPath($pvc_paths->get('styles'), $this->config->urls->templates));
-    $pvc_paths->set('scripts', $this->validateDir($pvc_paths->get('assets') . 'scripts/'));
-    $pvc_urls->set('scripts', $this->getRelPath($pvc_paths->get('scripts'), $this->config->urls->templates));
-    $pvc_paths->set('images', $this->validateDir($pvc_paths->get('assets') . 'images/'));
-    $pvc_urls->set('images', $this->getRelPath($pvc_paths->get('images'), $this->config->urls->templates));
-    $this->set('paths', $pvc_paths);
-    $this->set('urls', $pvc_urls);
-    if($this->paths->app_controller == "")
-      $appController = $this->config->paths->templates . self::APP_CONTROLLER;
-    else
-      $appController = $this->paths->appController. self::APP_CONTROLLER;
-    if(!file_exists($appController)) {
-      $path = dirname(__FILE__) . '/install/' . self::APP_CONTROLLER;
-      if(file_exists($path)) {
-        copy($path, $appController);
+    $pvcPaths = new Paths($this->config->paths->get('root'));
+    $pvcUrls = new Paths($this->config->urls->templates);
+    $pvcPaths->set('views',  $this->_getDefaultPath('views'));
+    $pvcPaths->set('controllers', $this->_getDefaultPath('controllers'));
+    $pvcPaths->set('layouts', $this->_getDefaultPath('layouts'));
+    $pvcPaths->set('snippets', $this->_getDefaultPath('snippets'));
+    $pvcPaths->set('assets', $this->_getDefaultPath('assets'));
+    $pvcUrls->set('assets', $this->getRelPath($pvcPaths->get('assets'), $this->config->urls->templates));
+    $pvcPaths->set('styles', $this->validateDir($pvcPaths->get('assets') . 'styles/'));
+    $pvcUrls->set('styles', $this->getRelPath($pvcPaths->get('styles'), $this->config->urls->templates));
+    $pvcPaths->set('scripts', $this->validateDir($pvcPaths->get('assets') . 'scripts/'));
+    $pvcUrls->set('scripts', $this->getRelPath($pvcPaths->get('scripts'), $this->config->urls->templates));
+    $pvcPaths->set('images', $this->validateDir($pvcPaths->get('assets') . 'images/'));
+    $pvcUrls->set('images', $this->getRelPath($pvcPaths->get('images'), $this->config->urls->templates));
+    $this->set('paths', $pvcPaths);
+    $this->set('urls', $pvcUrls);
+
+    // set up app controller
+    $baseControllerClass = $this->getClassName('base', 'controller', false);
+    if(!class_exists($baseControllerClass)) {
+      $baseControllerPath = $this->paths->controllers . $this->getFilenameFromClass($baseControllerClass, false);
+      if(!file_exists($baseControllerPath)) {
+        $path = dirname(__FILE__) . '/install/' . $this->getFilenameFromClass($baseControllerClass, false);
+        if(file_exists($path)) {
+          copy($path, $baseControllerPath);
+        }
       }
+      // include BaseController class
+      require_once($baseControllerPath);
     }
-    // include AppController class
-    require_once($appController);
   }
 
   /**
@@ -277,9 +276,10 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   // Sanitize controller name
-  public static function getClassName($templateName, $suffix='') {
-    $suffix = is_string($suffix) ? self::camelcase($suffix) : '';
-    $className = self::camelcase($templateName) . $suffix;
+  public static function getClassName($templateName, $type='', $protectBase=true) {
+    if(($protectBase) && ($templateName == 'base')) $templateName .= '1';
+    $type = is_string($type) ? self::camelcase($type) : '';
+    $className = self::camelcase($templateName) . $type;
     return $className;
   }
 
@@ -310,8 +310,18 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   // Get filename from classname
-  public static function getFilename($type, $className) {
-    $filename = self::sanitizeFilename($className);
+  public static function getFilenameFromClass($className, $protectBase=true) {
+    if(!preg_match('#^(([A-Z][a-z0-9]+)+)([A-Z][a-z]+)$#', $className, $match))
+      return false;
+    $name = strtolower($match[1]);
+    $type = strtolower($match[3]);
+    return self::getFilename($name, $type, $protectBase);
+  }
+
+  public static function getFilename($name, $type, $protectBase=true) {
+    if(($protectBase) && (strtolower($name) == 'base'))
+      $name .= '1';
+    $filename = self::sanitizeFilename($name);
     return $filename ? $filename . self::ext($type) : false;
   }
 
@@ -371,7 +381,7 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
       }
       $class = get_parent_class($class);
       $namespace = $reflection->getNamespaceName();
-    } while($class !== 'AppController' && $class !== 'PvcController');
+    } while($class !== 'BaseController' && $class !== 'PvcController');
     return $methods;
   }
 
@@ -441,8 +451,8 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     // field for app controller path
     $field = new InputfieldText();
     $field->label = 'App Controller folder, where is the App Controller located';
-    $field->attr('name+id', 'cfgAppControllerPath');
-    if(isset($data['cfgAppControllerPath']) ? $field->value = self::cleanPath($data['cfgAppControllerPath']) : $field->value = self::$defaults['appControllerPath']);
+    $field->attr('name+id', 'cfgBaseControllerPath');
+    if(isset($data['cfgBaseControllerPath']) ? $field->value = self::cleanPath($data['cfgBaseControllerPath']) : $field->value = self::$defaults['baseControllerPath']);
     $wrapper->append($field);
     $form->append($wrapper);
 
@@ -496,13 +506,14 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     $wrapper->append($field);
 
     $form->append($wrapper);
-    // copy AppController
+    // copy BaseController
     $modulePath = dirname(__FILE__) . '/install/';
     $basePath = dirname(getenv('SCRIPT_FILENAME')) . '/';
     $files = array(
-      'index.tmpl.php' => 'site/templates/views/home/',
+      'base.view.php' => 'site/templates/views/',
       'home.controller.php' => 'site/templates/controllers/',
-      'default.tmpl.php' => 'site/templates/layouts/'
+      'index.tmpl.php' => 'site/templates/views/home/',
+      'default.tmpl.php' => 'site/templates/layouts/',
     );
     foreach($files as $f => $dest) {
       $dest = $basePath . $dest;

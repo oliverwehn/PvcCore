@@ -189,14 +189,14 @@ class PvcView extends TemplateFile {
     $filename = $this->pvc->paths->views;
     $dir = PvcCore::sanitizeFilename(get_class($this));
     $filename .= $dir . '/';
-    $filename .= PvcCore::getFilename('template', $action);
+    $filename .= PvcCore::getFilename($action, 'template');
     return $filename;
   }
 
   protected function _initLayout($layoutName) {
     $class = PvcCore::getClassname($layoutName, 'layout');
     if($class && !class_exists($class)) {
-      $classFile = PvcCore::getFilename('layout', $class);
+      $classFile = PvcCore::getFilename($class, 'layout');
       $classPath = $this->pvc->paths->layouts . $classFile;
       // check if class file exists
       if(file_exists($classPath)) {

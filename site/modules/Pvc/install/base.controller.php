@@ -1,19 +1,19 @@
 <?php
 /**
- * Pvc AppController Class V. 1.0.0
+ * Pvc BaseController Class V. 1.0.0
  * Part of Pvc, a module for ProcessWire 2.4+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn/PvcCore
  *
- * Basic AppController that extends PvcController class.
+ * Basic BaseController that extends PvcController class.
  * General helper methods and properties can be declared here.
- * All template controllers should extend AppController and
- * will inherit methods and properties of AppController.
+ * All template controllers should extend BaseController and
+ * will inherit methods and properties of BaseController.
  *
  */
 
-class AppController extends PvcController {
+class BaseController extends PvcController {
 
   /**
    * Do general controller setup here.

@@ -28,7 +28,7 @@ class PvcLayout extends PvcView {
   public function ___getLayoutFilename($layout_name=NULL) {
     $path = $this->pvc->paths->layouts;
     if(!$layout_name) $layout_name = $this->_controller->get('layout');
-    $path .= $this->pvc->getFilename('template', $layout_name);
+    $path .= $this->pvc->getFilename($layout_name, 'template');
     return $path;
   }
   public function ___getViewFilename($template_name=null, $action = null) { return $this->getLayoutFilename($template_name=null); }

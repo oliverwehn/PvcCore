@@ -1,12 +1,12 @@
 <?php
 
-class HomeController extends AppController {
+class HomeController extends BaseController {
 
   /**
    * For general controller setup use init() method
    *
   public init() {
-    // If you have setup stuff done in AppController’s init() method,
+    // If you have setup stuff done in BaseController’s init() method,
     // don’t forget to call it!
     parent::init();
 
