@@ -101,7 +101,7 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     else
       $appController = $this->paths->appController. self::APP_CONTROLLER;
     if(!file_exists($appController)) {
-      $path = dirname(__FILE__) . '/' . install . '/' . self::APP_CONTROLLER;
+      $path = dirname(__FILE__) . '/install/' . self::APP_CONTROLLER;
       if(file_exists($path)) {
         copy($path, $appController);
       }
@@ -501,7 +501,8 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     $basePath = dirname(getenv('SCRIPT_FILENAME')) . '/';
     $files = array(
       'index.tmpl.php' => 'site/templates/views/home/',
-      'home.controller.php' => 'site/templates/controllers/'
+      'home.controller.php' => 'site/templates/controllers/',
+      'default.tmpl.php' => 'site/templates/layouts/'
     );
     foreach($files as $f => $dest) {
       $dest = $basePath . $dest;

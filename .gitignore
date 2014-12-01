@@ -1,6 +1,8 @@
 # Ignore everything
 *
+.DS_Store
 !.gitignore
+!README.md
 !site
 site/*
 !site/modules

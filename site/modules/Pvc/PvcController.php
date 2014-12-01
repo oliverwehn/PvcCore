@@ -79,6 +79,10 @@ class PvcController extends WireData {
         foreach($pageScope as $k => $v) {
           $result[$k] = $v;
         }
+        foreach($page->fields as $field) {
+          $k = $field->name;
+          $result[$k] = $page->$k;
+        }
       }
       $controllerScope = $this->getArray();
       foreach($controllerScope as $k => $v) {
