@@ -17,9 +17,9 @@ To install PvcCore, copy the Pvc folder to your ```site/modules/``` directory an
 
 After installation you’ll find some new folders in your ```site/templates/``` directory.
 
-### Folders and Files
+## Folders and Files
 
-#### Folder structure
+### Folder structure
 
 * __assets__ Where your scripts, styles and images are kept
   * __images__
@@ -31,7 +31,7 @@ After installation you’ll find some new folders in your ```site/templates/``` 
 * __views__ View files and templates go here
   * __home__ Each PW template gets its own view folder to keep a template for each action
 
-#### Base Files and Examples
+### Base Files and Examples
 
 Within the new folder structure you’ll find a few files.
 
@@ -40,3 +40,39 @@ Within the new folder structure you’ll find a few files.
 * ```site/templates/views/base.view.php``` contains the _BaseView_ class. It extends _PvcView_ and if you needed for example some custom view helpers, you’d define them here. Future view classes extend _BaseView_.
 * ```site/templates/views/home/index.tmpl.php``` is an action template. As _index_ is the default action of each controller, there has to be a template for it for each PW template.
 * ```site/templates/layouts/default.tmpl.php``` is the default layout in which’s outlet your action templates will be rendered.
+
+## How it works
+ProcessWire processes a page view through its _ProcessPageView__ module which then calls __render()__ method on the page to be rendered. The __render()__ method itself is a method hook provided to __Page__ objects through the __PageRender__ module. _PVC_ hooks into this process and makes PW initiate a _PvcView_ object (with its corresponding _PvcController_ object attached to it) instead of a _TemplateFile_. From there on _PVC_ takes care of the template processing.
+
+### View
+Each PW template gets an individual view class that inherits from _BaseView_ and/or _PvcView_ class. Its name is determined by the template’s name. So template _home_’s view class is named _HomeView_. _PVC_ looks up the class within the views folder. For template _home_ it would look for ```site/templates/views/home.view.php```. If the class can’t be found, it is generated on the fly. View classes are instanciated with a controller passed in.
+
+#### View Helpers
+What are view helpers?
+How are they defined?
+How to deal with inheritance?
+
+### Controller
+Each view gets an individual controller class that inherits from _BaseController_ and/or _PvcController_ class. Its name is determined by the template’s name. So template _home_’s controller class is named _HomeController_. _PVC_ looks up the class within the controllers folder. For template _home_ it would look for ```site/templates/controllers/home.controller.php```. If the class can’t be found, it is generated on the fly, too.
+
+#### Actions
+Public methods. Associated with routes/urlSegments.
+
+#### Action Routes
+Automatically defined.
+Dynamic action routes.
+
+### Action Templates
+Each action defined in a controller requires a template to be rendered. Like the _HomeController_’s _index_ action template is found in ```site/templates/views/home/index.tmpl.php```, an action _edit_ would need a template ```site/templates/views/home/edit.tmpl.php```.
+
+### Renderers
+Renderers are provided to _PVC_ as separate modules which implement a special interface to interact with the view while preparing rendering process. It’s the idea to allow implementing alternative template syntaxes by installing or developing other renderers.
+
+#### Native Renderer
+
+#### Renderer API
+Describe API, give an idea how to implement own renderers.
+
+## The Future
+* Maybe encapsuled template outlets?
+* More renderers. Which one?
