@@ -48,19 +48,32 @@ ProcessWire processes a page view through its _ProcessPageView__ module which th
 Each PW template gets an individual view class that inherits from _BaseView_ and/or _PvcView_ class. Its name is determined by the template’s name. So template _home_’s view class is named _HomeView_. _PVC_ looks up the class within the views folder. For template _home_ it would look for ```site/templates/views/home.view.php```. If the class can’t be found, it is generated on the fly. View classes are instanciated with a controller passed in.
 
 #### View Helpers
-What are view helpers?
+View helpers are functions that are made available as global functions within your action template context. As they are created from closures, they can be allowed to have access to the current scope. They can be quite handy tools to abstract view layer logic.
+
 How are they defined?
+
 How to deal with inheritance?
 
 ### Controller
 Each view gets an individual controller class that inherits from _BaseController_ and/or _PvcController_ class. Its name is determined by the template’s name. So template _home_’s controller class is named _HomeController_. _PVC_ looks up the class within the controllers folder. For template _home_ it would look for ```site/templates/controllers/home.controller.php```. If the class can’t be found, it is generated on the fly, too.
 
 #### Actions
-Public methods. Associated with routes/urlSegments.
+By default when you access a page via its url, its controller executes the _index_ action. But imagine the case you have an _article_ template and you provide a comment form. Now you can enable urlSegments for this template and define an _action_ named _comment_. To do so you just add a public method to your _ArticleController_ class. It will be executed as soon as you access the page with the segment ```/comment/``` attached to its URL. If you have multiple segments like ```/comment/list/```, the action method would be called _commentList_.
 
 #### Action Routes
-Automatically defined.
-Dynamic action routes.
+More interesting is, that you can wire particular patterns of URL segments to your actions and use dynamic parts as input. For example, if you want an action to be able to delete a comment, you’ll need the comment’s id within the action method.
+In _PVC_ this is done via _action routes_ that you can define within your controllers __init()__ method like this:
+
+```php
+class ArticleController extends BaseController {
+
+  public function init() {
+    $this->route('/delete/:id/', array('id'=>'^[0-9]+$'), 'delete');
+  }
+
+}
+```
+You pass the segment pattern into the controllers _route()_ method as the first argument. Second argument is an associative array that contains a regular expression to validate each dynamic segment. The third argument is the name of the action method you want to call when the route is accessed. All dynamic segments will be extracted and made available within your action method through ```$this->input->route```.
 
 ### Action Templates
 Each action defined in a controller requires a template to be rendered. Like the _HomeController_’s _index_ action template is found in ```site/templates/views/home/index.tmpl.php```, an action _edit_ would need a template ```site/templates/views/home/edit.tmpl.php```.
@@ -74,5 +87,5 @@ Renderers are provided to _PVC_ as separate modules which implement a special in
 Describe API, give an idea how to implement own renderers.
 
 ## The Future
-* Maybe encapsuled template outlets?
+* Maybe encapsulated template outlets to render actions within the template’s _index_ action template?
 * More renderers. Which one?
