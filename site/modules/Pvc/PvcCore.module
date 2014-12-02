@@ -116,18 +116,29 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
    * @return null
    */
   public function renderView($event) {
-    $oEvent = $event->arguments(0);
+    $oEvent = $event->arguments[0];
     $module = $event->object;
     $page = $oEvent->object;
+    // update options with route info
+    $optionsIndex = 0;
     if($page->template == 'admin') return;
-    $options = $oEvent->arguments(0);
-    if(is_string($options)) $options = $oEvent->arguments(1);
-    if(!is_array($options)) $options = array();
-    $this->_getActionRoute($options);
+    if(!is_array($oEvent->arguments($optionsIndex))) {
+      if(is_string($oEvent->arguments($optionsIndex))) {
+        $optionsIndex = 1;
+      }
+    }
+    if(!is_array($oEvent->arguments($optionsIndex)))
+      $options = array();
+    else
+      $options = $oEvent->arguments($optionsIndex);
+    $options = array_merge($options, $this->_getActionRoute($options));
+    $oEvent->arguments($optionsIndex, $options);
+
+    // get/create proxy and inject into render process
     if(($proxy = $this->get('proxy')) && ($proxy->id == $page->id)) {
       $oEvent->object = $proxy;
     }
-    else { echo $page->name;
+    else {
       $oEvent->object = new PvcPageProxy($page);
     }
     $event = $oEvent;
@@ -148,8 +159,9 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
       if(!array_key_exists('route', $options)) {
         $urlSegments = array();
         if($this->input->urlSegments) {
-          for($i=0, $cnt=$this->input->urlSegments->count; $i<$cnt; $i++) {
-            $urlSegments[] = $this->input->urlSegments($i);
+          for($i=0, $cnt=count($this->input->urlSegments); $i<=$cnt; $i++) {
+            if($segment = $this->input->urlSegments[$i])
+              $urlSegments[] = $segment;
           }
         }
         $options['route'] = '/' . (count($urlSegments) > 0 ? implode('/', $urlSegments) . '/' : '');

@@ -7,7 +7,7 @@
   <title><?=$page->title;?></title>
   <meta name="description" content="HTML5 Doc">
   <meta name="author" content="Pvc">
-  <meta name="generator" content="Pvc">
+  <meta name="generator" content="ProcessWire <?=$config->version?>">
 
 
   <?=styles('header')?>
