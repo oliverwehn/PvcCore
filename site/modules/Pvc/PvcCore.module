@@ -374,27 +374,29 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     return get_class($controller);
   }
 
-  // Get array of controller method names
-  private function _getControllerMethods($class) {
-    $methods = array();
-    if(!class_exists($classNs)) {
-      $controllerFile = $this->getControllerFilename($class);
-      $ControllerPath = $this->paths->controllers . $controllerFile . self::ext('controllers');
-      if((!require_once($ControllerPath)) && (!class_exists($class))) {
+  // Get array of controller actions
+  public static function getControllerActions($class) {
+    if(!class_exists($class)) {
+      if(isset($this))
+        $controllerPath = $this->paths->controllers . getFilenameFromClass($class);
+      else
+        $controllerPath = self::getConfigValue('cfgControllersPath') . self::getFilenameFromClass($class);
+      if((!require_once($controllerPath)) || (!class_exists($class)))
         return false;
-      }
     }
+    $actions = array();
+
     do {
       $reflection = new ReflectionClass($class);
       foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
         if ($method->class == $reflection->getName()) {
-          $methods[] = $method->name;
+          $actions[] = $method->name;
         }
       }
       $class = get_parent_class($class);
-      $namespace = $reflection->getNamespaceName();
     } while($class !== 'BaseController' && $class !== 'PvcController');
-    return $methods;
+    return $actions;
+
   }
 
   /**
