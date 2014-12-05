@@ -381,8 +381,15 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
         $controllerPath = $this->paths->controllers . getFilenameFromClass($class);
       else
         $controllerPath = self::getConfigValue('cfgControllersPath') . self::getFilenameFromClass($class);
-      if((!require_once($controllerPath)) || (!class_exists($class)))
+      $saveDir = getcwd();
+      chdir(dirname(getenv('SCRIPT_FILENAME')));
+      if((!@require_once($controllerPath)) || (!class_exists($class))) {
+        chdir($saveDir);
         return false;
+      }
+      else {
+        chdir($saveDir);
+      }
     }
     $actions = array();
 
@@ -396,7 +403,6 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
       $class = get_parent_class($class);
     } while($class !== 'BaseController' && $class !== 'PvcController');
     return $actions;
-
   }
 
   /**
