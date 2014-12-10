@@ -92,6 +92,6 @@ class PvcPageProxy extends WireData {
     return $this;
   }
   public function __call($method, $arguments=null) {
-    return call_user_func(array(&$this->_page, $method), $arguments);
+    return call_user_func_array(array(&$this->_page, $method), $arguments);
   }
 }

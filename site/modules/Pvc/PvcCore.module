@@ -396,7 +396,7 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     do {
       $reflection = new ReflectionClass($class);
       foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-        if ($method->class == $reflection->getName()) {
+        if ($method->class == $reflection->getName() && $method->name !== 'init') {
           $actions[] = $method->name;
         }
       }
