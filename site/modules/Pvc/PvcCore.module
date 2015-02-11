@@ -1,14 +1,11 @@
 <?php
 /**
- * Pvc Core Module Class V. 0.1.0
+ * Pvc Core Module Class V. 0.9.1
  * Part of Pvc, a module for ProcessWire 2.3+
  *
  * by Oliver Wehn
  * https://github.com/oliverwehn
  *
- * originally inspired by MVC Module by Harmster
- * https://github.com/Hawiak
- * hawiak.nl
  *
  * Core class takes care of routing requests to their
  * associated controllers and actions
@@ -16,7 +13,6 @@
  */
 require_once('PvcPageProxy.php');
 require_once('PvcView.php');
-require_once('PvcLayout.php');
 require_once('PvcController.php');
 
 class PvcCore extends WireData implements Module, ConfigurableModule {
@@ -94,6 +90,9 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     $this->set('paths', $pvcPaths);
     $this->set('urls', $pvcUrls);
 
+    // register class autoloader
+    spl_autoload_register(array(&$this, 'autoloadClass'));
+
     // set up app controller
     $baseControllerClass = $this->getClassName('base', 'controller', false);
     if(!class_exists($baseControllerClass)) {
@@ -107,6 +106,40 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
       // include BaseController class
       require_once($baseControllerPath);
     }
+  }
+
+  /**
+   * Auto-loads or generates PVC classes
+   * @method autoloadClass
+   * @param $className String
+   * @return true/false Boolean
+   */
+  public function autoloadClass($className) {
+    if(!preg_match('#^(([A-Z][a-z0-9]+)+)(View|Controller)$#', $className, $match)) return false;
+    $classId = $match[1];
+    $classType = strtolower($match[3]);
+    $classFilename = PvcCore::getConfigValue('cfg' . ucfirst($classType) .'sPath') . PvcCore::getFilenameFromClass($className, false);
+    // save working dir
+    $saveDir = getcwd();
+    chdir(dirname(getenv('SCRIPT_FILENAME')));
+    if(file_exists($classFilename)) require_once($classFilename);
+    // restore working dir
+    chdir($saveDir);
+    if(!class_exists($className)) {
+      if($classId !== 'Base') {
+        // look up base class for type
+        $baseClass = PvcCore::getClassName('Base', $classType);
+        $extendBaseClass = class_exists($baseClass) ? true : $this->autoloadClass($baseClass);
+      }
+      if($extendBaseClass)
+          $extended = call_user_func($baseClass . '::extend', $className);
+      else
+        $extended = call_user_func('Pvc' . ucfirst($classType) . '::extend', $className);
+      if(!$extended) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

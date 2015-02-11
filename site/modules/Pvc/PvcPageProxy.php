@@ -42,38 +42,8 @@ class PvcPageProxy extends WireData {
     chdir(dirname(getenv('SCRIPT_FILENAME')));
     // get controller class
     $controllerClass = PvcCore::getClassName($templateName, 'controller');
-    $controllerFilename = PvcCore::getConfigValue('cfgControllersPath') . PvcCore::getFilenameFromClass($controllerClass);
-    if(file_exists($controllerFilename)) require_once($controllerFilename);
-    if(!((class_exists($controllerClass)) || (PvcController::extend($controllerClass)))) {
-      throw new WireException(sprintf($this->_('Wasn’t able to set up controller "%s".'), $controllerClass));
-    }
     $controller = new $controllerClass($this);
-    // get base view class
-    $baseViewClass = PvcCore::getClassName('base', 'view', false);
-    $extendBaseViewClass = true;
-    if(!class_exists($baseViewClass)) {
-      $baseViewFilename = PvcCore::getConfigValue('cfgViewsPath') . PvcCore::getFilenameFromClass($baseViewClass, false);
-      if(file_exists($baseViewFilename)) require_once($baseViewFilename);
-      if(!class_exists($baseViewClass)) {
-        $extendBaseViewClass = PvcView::extend($baseViewClass);
-      }
-      else $extendBaseViewClass = false;
-    }
-    // get view class
     $viewClass = PvcCore::getClassName($templateName, 'view');
-    if(!class_exists($viewClass)) {
-      $viewFilename = PvcCore::getConfigValue('cfgViewsPath') . PvcCore::getFilenameFromClass($viewClass);
-      if(file_exists($viewFilename)) require_once($viewFilename);
-      if(!class_exists($viewClass)) {
-        if($extendBaseViewClass)
-            $extended = call_user_func($baseViewClass . '::extend', $viewClass);
-        else
-          $extended = PvcView::extend($viewClass);
-        if(!$extended) {
-          throw new WireException(sprintf($this->_('Wasn’t able to set up view "%s".'), $viewClass));
-        }
-      }
-    }
     $view = new $viewClass($controller);
     // store view instead of template file with page
     $page->set('output', $view);
