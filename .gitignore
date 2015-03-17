@@ -1,6 +1,7 @@
 # Ignore everything
 *
 .DS_Store
+**/*/.DS_Store
 !.gitignore
 !README.md
 !site
