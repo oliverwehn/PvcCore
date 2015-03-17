@@ -1,7 +1,5 @@
 # Ignore everything
 *
-.DS_Store
-**/*/.DS_Store
 !.gitignore
 !README.md
 !site
@@ -13,3 +11,5 @@ site/modules/*
 !site/modules/Pvc/**/*
 site/modules/Pvc/Twig
 site/modules/Pvc/PvcRendererTwig.module
+.DS_Store
+**/*/.DS_Store
