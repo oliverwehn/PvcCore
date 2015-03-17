@@ -11,9 +11,6 @@
  * associated controllers and actions
  *
  */
-require_once('PvcPageProxy.php');
-require_once('PvcView.php');
-require_once('PvcController.php');
 
 class PvcCore extends WireData implements Module, ConfigurableModule {
 
@@ -59,10 +56,10 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     Wire::setFuel('pvc', $this);
 
     // manipulate render event
-    // $this->addHookBefore('PageRender::renderPage', $this, 'renderView');
     $this->addHookBefore('Page::viewable', $this, 'stubTemplate');
-    //$this->addHookProperty('Template::filenameExists', $this, 'stubTemplate');
     $this->addHookBefore('PageRender::renderPage', $this, 'renderView');
+    $this->addHookAfter('PageRender::renderPage', $this, 'cacheOutput');
+
 
     // set up renderer
     if(!$this->cfgRendererName) {
@@ -115,31 +112,37 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
    * @return true/false Boolean
    */
   public function autoloadClass($className) {
-    if(!preg_match('#^(([A-Z][a-z0-9]+)+)(View|Controller)$#', $className, $match)) return false;
-    $classId = $match[1];
-    $classType = strtolower($match[3]);
-    $classFilename = PvcCore::getConfigValue('cfg' . ucfirst($classType) .'sPath') . PvcCore::getFilenameFromClass($className, false);
-    // save working dir
-    $saveDir = getcwd();
-    chdir(dirname(getenv('SCRIPT_FILENAME')));
-    if(file_exists($classFilename)) require_once($classFilename);
-    // restore working dir
-    chdir($saveDir);
-    if(!class_exists($className)) {
-      if($classId !== 'Base') {
-        // look up base class for type
-        $baseClass = PvcCore::getClassName('Base', $classType);
-        $extendBaseClass = class_exists($baseClass) ? true : $this->autoloadClass($baseClass);
-      }
-      if($extendBaseClass)
+    $matched = preg_match('#^(([A-Z][a-z0-9]+)+)(View|Controller)$#', $className, $match);
+    if($matched && $match[1] !== 'Pvc') {
+      $classId = $match[1];
+      $classType = strtolower($match[3]);
+      $classFilename = PvcCore::getConfigValue('cfg' . ucfirst($classType) .'sPath') . PvcCore::getFilenameFromClass($className, false);
+      // save working dir
+      $saveDir = getcwd();
+      chdir(dirname(getenv('SCRIPT_FILENAME')));
+      if(file_exists($classFilename)) require_once($classFilename);
+      // restore working dir
+      chdir($saveDir);
+      if(!class_exists($className)) {
+        if($classId !== 'Base') {
+          // look up base class for type
+          $baseClass = PvcCore::getClassName('Base', $classType);
+          $extendBaseClass = class_exists($baseClass) ? true : $this->autoloadClass($baseClass);
+        }
+        if($extendBaseClass)
           $extended = call_user_func($baseClass . '::extend', $className);
-      else
-        $extended = call_user_func('Pvc' . ucfirst($classType) . '::extend', $className);
-      if(!$extended) {
-        return false;
+        else
+          $extended = call_user_func('Pvc' . ucfirst($classType) . '::extend', $className);
       }
+      return true;
     }
-    return true;
+    else {
+      $classFilename = dirname(__FILE__) . '/' . $className . '.php';
+      if(file_exists($classFilename)) {
+        require_once($classFilename);
+      }
+      return class_exists($className);
+    }
   }
 
   /**
@@ -148,40 +151,110 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
    * @param $event Event Object
    * @return null
    */
-  public function renderView($event) {
-    $oEvent = $event->arguments[0];
-    $module = $event->object;
-    $page = $oEvent->object;
-    // update options with route info
-    $optionsIndex = 0;
-    if($page->template == 'admin') return;
-    if(!is_array($oEvent->arguments($optionsIndex))) {
-      if(is_string($oEvent->arguments($optionsIndex))) {
-        $optionsIndex = 1;
+  public function renderView($event) { 
+    if($this->page->rootParent->id !== $this->config->adminRootPageID) {
+      $oEvent = $event->arguments[0];
+      $module = $event->object;
+      $page = $oEvent->object;
+      $_page = $this->wire('page');
+      // update options with route info
+      $optionsIndex = 0;
+      if($page->template == 'admin') return;
+      if(!is_array($oEvent->arguments($optionsIndex))) {
+        if(is_string($oEvent->arguments($optionsIndex))) {
+          $optionsIndex = 1;
+        }
       }
-    }
-    if(!is_array($oEvent->arguments($optionsIndex)))
-      $options = array();
-    else
-      $options = $oEvent->arguments($optionsIndex);
-    $options = array_merge($options, $this->_getActionRoute($options));
-    $oEvent->arguments($optionsIndex, $options);
+      if(!is_array($oEvent->arguments($optionsIndex)))
+        $options = array();
+      else
+        $options = $oEvent->arguments($optionsIndex);
+      $options = array_merge(array(
+        'allowCache' => true,
+        'forceBuildCache' => false
+      ), $options, $this->_getActionRoute($options));
+      
+      // get cache and return if allowed
+      // $pageRender = $this->modules->get('PageRender');
+      $pageRender = $event->object;
 
-    // get/create proxy and inject into render process
-    if(($proxy = $this->get('proxy')) && ($proxy->id == $page->id)) {
-      $oEvent->object = $proxy;
+      if($options['allowCache']) { 
+
+        $cacheAllowed = $options['allowCache'] && $pageRender->isCacheAllowed($page);
+        $cacheFile = null;
+
+        if($cacheAllowed) { 
+          $cacheFile = $pageRender->getCacheFile($page, $options);
+          if(!$options['forceBuildCache'] && ($data = $cacheFile->get()) !== false) {
+            $event->replace = true;
+            // extract header from cache data
+            if(preg_match('#^\[(Content-type: ?([^\]]+))\]\n#i', $data, $match)) {
+              $data = implode("\n", array_slice(explode("\n", $data, 2), 1));
+              $contentType = $match[1];
+              header($contentType);
+            }
+            $oEvent->return = $data;
+            if($_page) $this->wire('page', $_page);
+            return;
+          }
+          else {
+            $options['allowCache'] = false;
+            $options['forceBuildCache'] = true;
+          }
+        }
+      }
+      if($optionsIndex == 1) {
+        $options['filename'] = $oEvent->arguments(0);
+        $oEvent->arguments($optionsIndex, null);
+        $optionsIndex = 0;
+      }
+      $oEvent->arguments($optionsIndex, $options);
+
+      // get/create proxy and inject into render process
+      if(($proxy = $this->get('proxy')) && ($proxy->id == $page->id)) {
+        $oEvent->object = $proxy;
+      }
+      else {
+        $oEvent->object = new PvcPageProxy($page);
+      }
+      $event = $oEvent;
     }
-    else {
-      $oEvent->object = new PvcPageProxy($page);
-    }
-    $event = $oEvent;
   }
 
-  public function stubTemplate($event)   {
+  public function cacheOutput($event) {
+    $oEvent = $event->arguments[0];
+    $page = $oEvent->object->get('page');
+    $options = $oEvent->arguments[0];
+    if(!$options['allowCache'] && $options['forceBuildCache']) {
+      $options['allowCache'] = true;
+      $options['forceBuildCache'] = false;
+      $data = $oEvent->return;
+      // extract content-type header
+      $headers = headers_list();
+      $header = false;
+      for($i=count($headers)-1; $i>=0; $i--) {
+        if(preg_match('#^Content\-type:#i', $headers[$i])) {
+          $header = $headers[$i];
+          break;
+        }
+      }
+      // store content-type header
+      if($header)
+        $data = "[{$header}]\n" . $data;
+      // save output data to cache file
+      $pageRender = $event->object; 
+      $cacheFile = $pageRender->getCacheFile($page, $options);
+      $cacheFile->save($data);
+    }
+  }
+
+  public function stubTemplate($event) {
     $page = $event->object;
-    $proxy = new PvcPageProxy($page);
-    $this->set('proxy', $proxy);
-    $event->return = true;
+    if($page->rootParent->id !== $this->config->adminRootPageID) {
+      $proxy = new PvcPageProxy($page);
+      $this->set('proxy', $proxy);
+      $event->return = true;
+    }
   }
 
   /**
@@ -339,9 +412,10 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
   }
 
   // Sanitize filename
-  public static function sanitizeFilename($className) {
-    if(preg_match_all("#([A-Z][^A-Z$]+)#", $className, $matches)) {
-      array_pop($matches[1]);
+  public static function sanitizeFilename($className) { 
+    if(preg_match_all("#([A-Z][^A-Z$]+)#", $className, $matches)) { 
+      if(in_array($matches[1][count($matches[1]) - 1], array('View', 'Controller'))) 
+        array_pop($matches[1]);
       $filename = strtolower(implode('_', $matches[1]));
     } else {
       $filename = strtolower($className);
@@ -358,7 +432,7 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
   public static function getFilenameFromClass($className, $protectBase=true) {
     if(!preg_match('#^(([A-Z][a-z0-9]+)+)([A-Z][a-z]+)$#', $className, $match))
       return false;
-    $name = strtolower($match[1]);
+    $name = $match[1];
     $type = strtolower($match[3]);
     return self::getFilename($name, $type, $protectBase);
   }
@@ -383,16 +457,6 @@ class PvcCore extends WireData implements Module, ConfigurableModule {
     $controllerName = implode('', $parts);
     if(!preg_match("#^([A-Z][a-z0-9]+)+$#", $controllerName)) return false;
     return $controllerName . ($class ? 'Controller' : '');
-  }
-
-  // Get filename from controller name
-  public static function getControllerFilename($controllerName) {
-    if(preg_match_all("#([A-Z][^A-Z$]+)#", preg_replace("#Controller$#", '', preg_replace("#^Pvc\\\#", '',$controllerName)), $matches)) {
-      $filename = strtolower(implode('_', $matches[1]));
-      return $filename;
-    } else {
-      return false;
-    }
   }
 
   // Get controller class name with or without namespace
