@@ -205,7 +205,7 @@ class PvcController extends WireData {
   /* Add a script to be available to the view
    * @method script
    */
-  public function script($name, $group="base", $prio=0) {
+  public function script($name, $group="base", $prio=NULL) {
     return $this->_setAsset('scripts', $group, $prio, $name);
   }
   /* Add a stylesheet to be available to the view
@@ -225,7 +225,7 @@ class PvcController extends WireData {
     $assetsGroup = $assetsForType->get($group);
     $newAsset = new \WireData;
     $newAssetPath = preg_match("#^(http:)?//#i", $name) ? $name : $this->pvc->urls->$type . $name;
-    $newAsset->set('path', $newAssetPath)->set('priority', $prio);
+    $newAsset->set('path', $newAssetPath)->set('priority', $prio !== NULL ? $prio : $assetsGroup->count());
     $assetsGroup->set($name, $newAsset);
     return $assetsGroup->count;
   }
