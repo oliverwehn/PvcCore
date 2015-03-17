@@ -12,7 +12,7 @@ class PvcPageProxy extends WireData {
     $controller = $view->get('controller');
     $action = $controller->calledAction(true);
     $filename = $view->getViewFilename($action);
-    $page->template->set('filename', $filename);
+    $page->template->set('filename', __FILE__);
     $page->template->set('altFilename', '');
 
     return $this->_page->id;
