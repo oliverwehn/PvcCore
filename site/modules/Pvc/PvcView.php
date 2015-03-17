@@ -1,6 +1,6 @@
 <?php
 /**
- * Pvc View Class V. 0.9.0
+ * Pvc View Class V. 0.9.1
  * Part of Pvc, a module for ProcessWire 2.5+
  *
  * by Oliver Wehn
@@ -38,6 +38,17 @@ class PvcView extends TemplateFile {
     }
     else {
       throw new Wire404Exception(sprintf($this->_('View file "%s" was not found.'), $filename));
+    }
+  }
+
+  public function ___loadLayoutFile() {
+    $filename = $this->getLayoutFilename();
+    if(file_exists($filename)) {
+      \TemplateFile::__construct($filename);
+      return $filename;
+    }
+    else {
+      return FALSE;
     }
   }
 
@@ -85,14 +96,18 @@ class PvcView extends TemplateFile {
         $out = "\n" . $renderer->render($this, $scope) . "\n";
         $options = $this->get('options');
         if(count($options['pageStack']) == 0) {
-          $layoutName = $this->_controller->get('layout');
-          if($layoutName != NULL) {
-            $layout = $this->_initLayout($layoutName);
-            if($layout->loadLayoutFile()) {
-              $scope['outlet'] = $out;
-              $layout->importScope($scope);
-              $out = $layout->render();
-            }
+          // $layoutName = $this->_controller->get('layout');
+          // if($layoutName != NULL) {
+          //   $layout = $this->_initLayout($layoutName);
+          //   if($layout->loadLayoutFile()) {
+          //     $scope['outlet'] = $out;
+          //     $layout->importScope($scope);
+          //     $out = $layout->render();
+          //   }
+          // }
+          if($layoutFilename = $this->loadLayoutFile()) {
+            $scope['outlet'] = $out;
+            $out = $renderer->render($this, $scope, $layoutFilename);
           }
         }
 
@@ -193,6 +208,13 @@ class PvcView extends TemplateFile {
     return $filename;
   }
 
+  public function ___getLayoutFilename($layout_name=NULL) {
+    $filename = $this->pvc->paths->layouts;
+    if(!$layout_name) $layout_name = $this->_controller->get('layout');
+    $filename .= PvcCore::getFilename($layout_name, 'template');
+    return $filename;
+  }
+
   protected function _initLayout($layoutName) {
     $class = PvcCore::getClassname($layoutName, 'layout');
     if($class && !class_exists($class)) {
@@ -261,10 +283,12 @@ class PvcView extends TemplateFile {
       if(strpos($page, '=') > 0) {
         $page = $this->pages->get($page);
       }
-      elseif(preg_match('#^/?[a-z0-9_\-/]+$#', $page)) {
-        $it = $page;
-        if(strpos($it, '/') > 0) {
-          $it = $this->page->path + '/' + $it;
+      elseif(preg_match('#^(\.?/)?[a-z0-9_\-/]+$#', $page, $match)) {
+        if($match[1] === './' || !$match[1]) {
+          $it = $this->page->path . ltrim($page, './');
+        }
+        else {
+          $it = $page;
         }
         $page = $this->pages->get("path={$it}");
         if(!$page->id) {
@@ -288,7 +312,7 @@ class PvcView extends TemplateFile {
           $page = $this->pages->get($page->id);
         }
       }
-      else $page = $this->pages->get('name=' . $page);;
+      else $page = $this->pages->get('name=' . $page);
     }
     if(!($page instanceof \Page)) return false;
     return $page->render($options);
